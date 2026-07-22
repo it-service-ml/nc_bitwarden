@@ -1,7 +1,12 @@
 <template>
   <div class="bw-app">
+    <div v-if="restoringSession" class="bw-session-restore">
+      <NcLoadingIcon :size="48" />
+      <p>Tresor-Sitzung wird wiederhergestellt…</p>
+    </div>
+
     <LoginForm
-      v-if="!isLoggedIn"
+      v-else-if="!isLoggedIn"
       @logged-in="onLoggedIn"
     />
 
@@ -56,7 +61,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import LockIcon      from 'vue-material-design-icons/Lock.vue'
 import LoginForm     from './components/LoginForm.vue'
@@ -68,6 +73,11 @@ import {
   decryptCipher, decryptEncString,
   decryptRsaPrivateKey, decryptOrgKeys,
 } from './services/crypto.js'
+import {
+  clearSessionKey,
+  restoreSessionKey,
+  saveSessionKey,
+} from './services/sessionKeyStore.js'
 
 // camelCase (Vaultwarden) → PascalCase (Bitwarden Cloud) Normalizer
 function toPascal(o) {
@@ -77,6 +87,7 @@ function toPascal(o) {
   return o
 }
 
+const restoringSession = ref(true)
 const isLoggedIn   = ref(false)
 const userKey      = ref(null)
 const items        = ref([])
@@ -86,10 +97,22 @@ const loading      = ref(false)
 const showForm     = ref(false)
 const editItem     = ref(null)
 
-async function onLoggedIn({ masterKey }) {
+async function onLoggedIn({ masterKey, keepUnlocked = true }) {
   userKey.value    = masterKey
   isLoggedIn.value = true
-  await loadVault()
+
+  if (keepUnlocked) {
+    saveSessionKey(masterKey)
+  } else {
+    clearSessionKey()
+  }
+
+  const loaded = await loadVault()
+
+  if (!loaded) {
+    clearSessionKey()
+    resetVaultState()
+  }
 }
 
 async function loadVault() {
@@ -128,14 +151,52 @@ async function loadVault() {
     items.value = cipherResults.filter(r => r.status === 'fulfilled').map(r => r.value)
 
     console.info(`[nc_bitwarden] Vault geladen: ${items.value.length} Einträge, ${folders.value.length} Ordner`)
+    return true
   } catch (e) {
     console.error('[nc_bitwarden] loadVault Fehler:', e)
+    return false
   } finally {
     loading.value = false
   }
 }
 
-function logout()          { userKey.value = null; isLoggedIn.value = false; items.value = []; folders.value = []; selectedItem.value = null }
+function resetVaultState() {
+  userKey.value = null
+  isLoggedIn.value = false
+  items.value = []
+  folders.value = []
+  selectedItem.value = null
+  showForm.value = false
+  editItem.value = null
+}
+
+function logout() {
+  clearSessionKey()
+  resetVaultState()
+}
+
+onMounted(async () => {
+  try {
+    const restoredKey = restoreSessionKey()
+
+    if (!restoredKey) {
+      return
+    }
+
+    userKey.value = restoredKey
+    isLoggedIn.value = true
+
+    const loaded = await loadVault()
+
+    if (!loaded) {
+      clearSessionKey()
+      resetVaultState()
+    }
+  } finally {
+    restoringSession.value = false
+  }
+})
+
 function onDelete(id)      { items.value = items.value.filter(i => i.id !== id); selectedItem.value = null }
 function onSaved(item)     {
   const idx = items.value.findIndex(i => i.id === item.id)
@@ -154,6 +215,16 @@ function openEditForm(item){ editItem.value = item; showForm.value = true }
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.bw-session-restore {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--color-text-maxcontrast);
 }
 
 /* ── Zweispaltiges Layout ── */

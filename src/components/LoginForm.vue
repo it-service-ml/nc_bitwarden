@@ -19,6 +19,13 @@
           :disabled="loading"
           @keyup.enter="doLogin" />
       </div>
+      <label class="bw-login__remember">
+        <input
+          v-model="keepUnlocked"
+          type="checkbox"
+          :disabled="loading">
+        <span>Für diesen Browser-Tab entsperrt lassen</span>
+      </label>
       <NcButton type="primary" :disabled="loading || !email || !masterPassword || (twoFactorRequired && !twoFactorToken)" @click="doLogin" wide>
         <template #icon><NcLoadingIcon v-if="loading" :size="20" /></template>
         {{ loading ? 'Einloggen...' : 'Entsperren' }}
@@ -32,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import NcTextField     from '@nextcloud/vue/components/NcTextField'
 import NcPasswordField from '@nextcloud/vue/components/NcPasswordField'
 import NcButton        from '@nextcloud/vue/components/NcButton'
@@ -57,8 +64,22 @@ const email          = ref('')
 const masterPassword = ref('')
 const twoFactorToken = ref('')
 const twoFactorRequired = ref(false)
+const keepUnlocked   = ref(true)
 const loading        = ref(false)
 const error          = ref('')
+
+onMounted(async () => {
+  try {
+    const profile = await BitwardenApi.getCurrentUserProfile()
+    const profileEmail = profile?.email?.trim()
+
+    if (!email.value && profileEmail) {
+      email.value = profileEmail
+    }
+  } catch (error) {
+    console.warn('[nc_bitwarden] Nextcloud-E-Mail konnte nicht geladen werden:', error)
+  }
+})
 
 async function doLogin() {
   error.value   = ''
@@ -119,7 +140,11 @@ async function doLogin() {
     twoFactorToken.value = ''
     twoFactorRequired.value = false
     masterPassword.value = ''
-    emit('logged-in', { masterKey: userKey, loginData })
+    emit('logged-in', {
+      masterKey: userKey,
+      loginData,
+      keepUnlocked: keepUnlocked.value,
+    })
 
   } catch (e) {
     // Axios-Fehler: e.response.data.error  |  direkter Fehler: e.message
@@ -137,5 +162,17 @@ async function doLogin() {
 .bw-login__card  { max-width: 400px; width: 100%; padding: 2rem; border-radius: var(--border-radius-large); box-shadow: var(--box-shadow); background: var(--color-main-background); }
 .bw-login__logo  { width: 64px; display: block; margin: 0 auto 1rem; }
 .bw-login__field { margin-bottom: 1rem; }
+.bw-login__remember {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.bw-login__remember input {
+  width: 18px;
+  height: 18px;
+}
 .bw-login__hint  { font-size: 0.8rem; color: var(--color-text-maxcontrast); margin-top: 1rem; text-align: center; }
 </style>

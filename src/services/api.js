@@ -7,6 +7,28 @@ export const BitwardenApi = {
   async getSettings()              { return (await axios.get(base('/settings'))).data },
   async saveSettings(data)         { return (await axios.post(base('/settings'), data)).data },
 
+  async getCurrentUserProfile() {
+    const userId = document.head?.getAttribute('data-user')
+
+    if (!userId) {
+      return null
+    }
+
+    const response = await axios.get(
+      generateUrl(`/ocs/v2.php/cloud/users/${encodeURIComponent(userId)}`),
+      {
+        headers: {
+          'OCS-APIRequest': 'true',
+        },
+        params: {
+          format: 'json',
+        },
+      },
+    )
+
+    return response.data?.ocs?.data ?? null
+  },
+
   async prelogin(email)            { return (await axios.post(base('/api/prelogin'), { email })).data },
   async login(email, passwordHash, twoFactorToken = null) { const data = { email, passwordHash }
 
