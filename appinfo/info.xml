@@ -18,7 +18,7 @@
     <bugs>https://github.com/yourname/nc_bitwarden/issues</bugs>
     <dependencies>
         <php min-version="8.1"/>
-        <nextcloud min-version="31" max-version="33"/>
+        <nextcloud min-version="31" max-version="34"/>
     </dependencies>
     <navigations>
         <navigation>
