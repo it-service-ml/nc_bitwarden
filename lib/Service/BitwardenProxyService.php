@@ -53,23 +53,57 @@ class BitwardenProxyService {
         $urls     = $this->settingsService->getApiUrls($userId);
         $settings = $this->settingsService->getSettings($userId);
         $client   = $this->httpClientService->newClient();
+        $formParams = [
+            'grant_type' => 'password',
+            'username' => $credentials['email'],
+            'password' => $credentials['passwordHash'],
+            'scope' => 'api offline_access',
+            'client_id' => 'web',
+            'deviceType' => 10,
+            'deviceIdentifier' => $settings['device_id'],
+            'deviceName' => 'Nextcloud Bitwarden App',
+        ];
+
+        if (!empty($credentials['twoFactorToken'])) {
+            $formParams['twoFactorProvider'] = (int)($credentials['twoFactorProvider'] ?? 0);
+            $formParams['twoFactorToken'] = $credentials['twoFactorToken'];
+            $formParams['twoFactorRemember'] = !empty($credentials['twoFactorRemember']) ? '1' : '0';
+        }
+
         try {
             $response = $client->post(
                 $urls['identity'] . '/connect/token',
                 array_merge($this->baseOptions, [
-                    'form_params' => [
-                        'grant_type'       => 'password',
-                        'username'         => $credentials['email'],
-                        'password'         => $credentials['passwordHash'],
-                        'scope'            => 'api offline_access',
-                        'client_id'        => 'web',
-                        'deviceType'       => 10,
-                        'deviceIdentifier' => $settings['device_id'],
-                        'deviceName'       => 'Nextcloud Bitwarden App',
-                    ],
+                    'form_params' => $formParams,
                 ])
             );
         } catch (\Exception $e) {
+            if (method_exists($e, 'getResponse') && ($resp = $e->getResponse()) !== null) {
+                $body = json_decode((string)$resp->getBody(), true);
+
+                if (is_array($body)) {
+                    $customResponse = $body['CustomResponse']
+                        ?? $body['customResponse']
+                        ?? [];
+
+                    $providers = $body['TwoFactorProviders']
+                        ?? $body['twoFactorProviders']
+                        ?? $customResponse['TwoFactorProviders']
+                        ?? $customResponse['twoFactorProviders']
+                        ?? null;
+
+                    if (is_array($providers)) {
+                        return [
+                            'twoFactorRequired' => true,
+                            'twoFactorProviders' => array_map('intval', $providers),
+                            'error' => $body['error'] ?? 'invalid_grant',
+                            'error_description' => $body['error_description']
+                                ?? 'Two factor required.',
+                        ];
+                    }
+                }
+            }
+
             throw new \RuntimeException($this->extractErrorMessage($e), 0, $e);
         }
         $data = json_decode($response->getBody(), true);
@@ -101,9 +135,9 @@ class BitwardenProxyService {
                 $urls['identity'] . '/connect/token',
                 array_merge($this->baseOptions, [
                     'form_params' => [
-                        'grant_type'    => 'refresh_token',
+                        'grant_type' => 'refresh_token',
                         'refresh_token' => $refreshToken,
-                        'client_id'     => 'web',
+                        'client_id' => 'web',
                     ],
                 ])
             );

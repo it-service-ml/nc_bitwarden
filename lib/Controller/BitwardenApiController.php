@@ -43,6 +43,9 @@ class BitwardenApiController extends Controller {
             return new JSONResponse($this->proxyService->login($this->userId, [
                 'email'        => (string)$this->request->getParam('email', ''),
                 'passwordHash' => (string)$this->request->getParam('passwordHash', ''),
+                'twoFactorProvider' => $this->request->getParam('twoFactorProvider'),
+                'twoFactorToken' => (string)$this->request->getParam('twoFactorToken', ''),
+                'twoFactorRemember' => (bool)$this->request->getParam('twoFactorRemember', false),
             ]));
         } catch (\Exception $e) {
             $this->logger->warning('nc_bitwarden: login failed', [

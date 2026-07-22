@@ -10,7 +10,16 @@
       <div class="bw-login__field">
         <NcPasswordField v-model="masterPassword" label="Master-Passwort" :disabled="loading" @keyup.enter="doLogin" />
       </div>
-      <NcButton type="primary" :disabled="loading || !email || !masterPassword" @click="doLogin" wide>
+      <div v-if="twoFactorRequired" class="bw-login__field">
+        <NcTextField
+          v-model="twoFactorToken"
+          label="Authenticator-Code"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          :disabled="loading"
+          @keyup.enter="doLogin" />
+      </div>
+      <NcButton type="primary" :disabled="loading || !email || !masterPassword || (twoFactorRequired && !twoFactorToken)" @click="doLogin" wide>
         <template #icon><NcLoadingIcon v-if="loading" :size="20" /></template>
         {{ loading ? 'Einloggen...' : 'Entsperren' }}
       </NcButton>
@@ -46,6 +55,8 @@ function toPascal(o) {
 const emit           = defineEmits(['logged-in'])
 const email          = ref('')
 const masterPassword = ref('')
+const twoFactorToken = ref('')
+const twoFactorRequired = ref(false)
 const loading        = ref(false)
 const error          = ref('')
 
@@ -79,7 +90,24 @@ async function doLogin() {
 
     const passwordHash = await makeMasterPasswordHash(masterKeyBuffer, masterPassword.value)
     // Login-Response normalisieren (Vaultwarden: camelCase, Bitwarden Cloud: PascalCase)
-    const loginData    = toPascal(await BitwardenApi.login(email.value, passwordHash))
+    const loginData = toPascal(await BitwardenApi.login(
+      email.value,
+      passwordHash,
+      twoFactorRequired.value ? twoFactorToken.value : null,
+    ))
+
+    if (loginData.TwoFactorRequired) {
+      const providers = loginData.TwoFactorProviders ?? []
+
+      if (!providers.map(Number).includes(0)) {
+        throw new Error('Zwei-Faktor-Anmeldung erforderlich, aber TOTP/Authenticator wird nicht angeboten.')
+      }
+
+      twoFactorRequired.value = true
+      twoFactorToken.value = ''
+      error.value = 'Bitte den sechsstelligen Code deiner Authenticator-App eingeben.'
+      return
+    }
 
     // Nach Normalisierung immer PascalCase: 'Key'
     const encUserKey = loginData.Key
@@ -88,6 +116,8 @@ async function doLogin() {
     }
 
     const userKey = await decryptUserSymmetricKey(encUserKey, masterKeyBuffer)
+    twoFactorToken.value = ''
+    twoFactorRequired.value = false
     masterPassword.value = ''
     emit('logged-in', { masterKey: userKey, loginData })
 

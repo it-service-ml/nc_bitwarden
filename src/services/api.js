@@ -8,7 +8,15 @@ export const BitwardenApi = {
   async saveSettings(data)         { return (await axios.post(base('/settings'), data)).data },
 
   async prelogin(email)            { return (await axios.post(base('/api/prelogin'), { email })).data },
-  async login(email, passwordHash) { return (await axios.post(base('/api/login'), { email, passwordHash })).data },
+  async login(email, passwordHash, twoFactorToken = null) { const data = { email, passwordHash }
+
+		if (twoFactorToken) {
+			data.twoFactorProvider = 0
+			data.twoFactorToken = twoFactorToken
+			data.twoFactorRemember = false
+		}
+
+		return (await axios.post(base('/api/login'), data)).data },
   async refresh()                  { return (await axios.post(base('/api/refresh'))).data },
 
   async sync()                     { return (await axios.get(base('/api/sync'))).data },
