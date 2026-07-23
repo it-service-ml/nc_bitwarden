@@ -10,14 +10,14 @@ const decoder = new TextDecoder()
 
 export function b64ToBuffer(b64) {
   const binary = atob(b64)
-  const bytes  = new Uint8Array(binary.length)
+  const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return bytes.buffer
 }
 
 export function bufferToB64(buffer) {
-  const bytes  = new Uint8Array(buffer)
-  let   binary = ''
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
   for (const b of bytes) binary += String.fromCharCode(b)
   return btoa(binary)
 }
@@ -28,13 +28,13 @@ export async function deriveMasterKeyPBKDF2(password, email, iterations = 600000
   const mat = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits'])
   return crypto.subtle.deriveBits(
     { name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(email.trim().toLowerCase()), iterations },
-    mat, 256
+    mat, 256,
   )
 }
 
 export async function deriveMasterKeyArgon2id(password, email, memory, iterations, parallelism) {
-  const { argon2id }  = await import('@noble/hashes/argon2')
-  const saltBuffer    = await crypto.subtle.digest('SHA-256', encoder.encode(email.trim().toLowerCase()))
+  const { argon2id } = await import('@noble/hashes/argon2')
+  const saltBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(email.trim().toLowerCase()))
   const hash = argon2id(encoder.encode(password), new Uint8Array(saltBuffer), {
     t: iterations, m: memory * 1024, p: parallelism, dkLen: 32,
   })
@@ -42,17 +42,17 @@ export async function deriveMasterKeyArgon2id(password, email, memory, iteration
 }
 
 export async function makeMasterPasswordHash(masterKeyBuffer, password) {
-  const key  = await crypto.subtle.importKey('raw', masterKeyBuffer, 'PBKDF2', false, ['deriveBits'])
+  const key = await crypto.subtle.importKey('raw', masterKeyBuffer, 'PBKDF2', false, ['deriveBits'])
   const hash = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(password), iterations: 1 },
-    key, 256
+    key, 256,
   )
   return bufferToB64(hash)
 }
 
 // HKDF-Expand (kein Extract) – entspricht Bitwarden hkdfExpand()
 async function hkdfExpand(prkBuffer, info, outputLen = 32) {
-  const prk   = await crypto.subtle.importKey('raw', prkBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const prk = await crypto.subtle.importKey('raw', prkBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   const input = new Uint8Array(encoder.encode(info).length + 1)
   input.set(encoder.encode(info))
   input[input.length - 1] = 0x01
@@ -77,7 +77,7 @@ export function parseEncString(encStr) {
   if (!encStr || typeof encStr !== 'string') return null
   const dotIdx = encStr.indexOf('.')
   if (dotIdx < 0) return null
-  const type  = parseInt(encStr.substring(0, dotIdx), 10)
+  const type = parseInt(encStr.substring(0, dotIdx), 10)
   const parts = encStr.substring(dotIdx + 1).split('|')
 
   // RSA-Typen 3/4/5/6: kein IV, nur Ciphertext (+ optionaler MAC)
@@ -90,8 +90,8 @@ export function parseEncString(encStr) {
   if (parts.length < 2) return null
   return {
     type,
-    iv:  b64ToBuffer(parts[0]),
-    ct:  b64ToBuffer(parts[1]),
+    iv: b64ToBuffer(parts[0]),
+    ct: b64ToBuffer(parts[1]),
     mac: parts[2] ? b64ToBuffer(parts[2]) : null,
   }
 }
@@ -99,7 +99,7 @@ export function parseEncString(encStr) {
 // ─── AES-CBC Decryption ───────────────────────────────────────────────────────
 
 async function verifyHmac(iv, ct, mac, macKeyBuffer) {
-  const macKey   = await crypto.subtle.importKey('raw', macKeyBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'])
+  const macKey = await crypto.subtle.importKey('raw', macKeyBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'])
   const combined = new Uint8Array(iv.byteLength + ct.byteLength)
   combined.set(new Uint8Array(iv))
   combined.set(new Uint8Array(ct), iv.byteLength)
@@ -128,8 +128,8 @@ export async function decryptEncString(encStr, encKeyBuffer, macKeyBuffer) {
 
 export async function decryptUserSymmetricKey(encKeyString, masterKeyBuffer) {
   const stretched = await stretchMasterKey(masterKeyBuffer)
-  const raw       = await decryptEncStringRaw(encKeyString, stretched.encKey, stretched.macKey)
-  const bytes     = new Uint8Array(raw)
+  const raw = await decryptEncStringRaw(encKeyString, stretched.encKey, stretched.macKey)
+  const bytes = new Uint8Array(raw)
   return { encKey: bytes.slice(0, 32).buffer, macKey: bytes.slice(32, 64).buffer }
 }
 
@@ -145,7 +145,7 @@ export async function decryptRsaPrivateKey(encPrivateKeyStr, userKey) {
   for (const hash of ['SHA-1', 'SHA-256']) {
     try {
       return await crypto.subtle.importKey(
-        'pkcs8', rawPkcs8, { name: 'RSA-OAEP', hash }, false, ['decrypt']
+        'pkcs8', rawPkcs8, { name: 'RSA-OAEP', hash }, false, ['decrypt'],
       )
     } catch { /* nächsten Hash versuchen */ }
   }
@@ -163,7 +163,7 @@ export async function decryptOrgKeys(organizations = [], rsaPrivateKey) {
     try {
       const parsed = parseEncString(org.Key)
       if (!parsed || !parsed.ct) return
-      const raw   = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, rsaPrivateKey, parsed.ct)
+      const raw = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, rsaPrivateKey, parsed.ct)
       const bytes = new Uint8Array(raw)
       keys[org.Id] = { encKey: bytes.slice(0, 32).buffer, macKey: bytes.slice(32, 64).buffer }
     } catch (e) {
@@ -177,14 +177,14 @@ export async function decryptOrgKeys(organizations = [], rsaPrivateKey) {
 
 export async function encryptString(plaintext, encKeyBuffer, macKeyBuffer) {
   if (!plaintext) return null
-  const iv     = crypto.getRandomValues(new Uint8Array(16))
+  const iv = crypto.getRandomValues(new Uint8Array(16))
   const encKey = await crypto.subtle.importKey('raw', encKeyBuffer, { name: 'AES-CBC' }, false, ['encrypt'])
-  const ct     = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, encKey, encoder.encode(plaintext))
+  const ct = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, encKey, encoder.encode(plaintext))
   const combined = new Uint8Array(iv.byteLength + ct.byteLength)
   combined.set(iv)
   combined.set(new Uint8Array(ct), iv.byteLength)
   const macKey = await crypto.subtle.importKey('raw', macKeyBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const mac    = await crypto.subtle.sign('HMAC', macKey, combined)
+  const mac = await crypto.subtle.sign('HMAC', macKey, combined)
   return `2.${bufferToB64(iv.buffer)}|${bufferToB64(ct)}|${bufferToB64(mac)}`
 }
 
@@ -216,15 +216,15 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
   }
 
   const base = {
-    id:           cipher.Id,
-    type:         cipher.Type,
-    folderId:     cipher.FolderId,
+    id: cipher.Id,
+    type: cipher.Type,
+    folderId: cipher.FolderId,
     collectionIds: Array.isArray(cipher.CollectionIds)
       ? cipher.CollectionIds
       : [],
-    favorite:     cipher.Favorite,
-    name:         await dec(cipher.Name),
-    notes:        await dec(cipher.Notes),
+    favorite: cipher.Favorite,
+    name: await dec(cipher.Name),
+    notes: await dec(cipher.Notes),
     revisionDate: cipher.RevisionDate,
     organizationId: cipher.OrganizationId ?? null,
   }
@@ -235,23 +235,23 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
       base.login = {
         username: await dec(login.Username),
         password: await dec(login.Password),
-        totp:     await dec(login.Totp),
+        totp: await dec(login.Totp),
         uris: await Promise.all((login.Uris ?? []).map(async u => ({
           uri: await dec(u.Uri), match: u.Match,
         }))),
       }
       break
     }
-    case 2: break  // Secure Note – nur Name + Notes, kein weiteres Objekt
+    case 2: break // Secure Note – nur Name + Notes, kein weiteres Objekt
     case 3: {
       const card = cipher.Card ?? {}
       base.card = {
         cardholderName: await dec(card.CardholderName),
-        brand:          await dec(card.Brand),
-        number:         await dec(card.Number),
-        expMonth:       await dec(card.ExpMonth),
-        expYear:        await dec(card.ExpYear),
-        code:           await dec(card.Code),
+        brand: await dec(card.Brand),
+        number: await dec(card.Number),
+        expMonth: await dec(card.ExpMonth),
+        expYear: await dec(card.ExpYear),
+        code: await dec(card.Code),
       }
       break
     }
@@ -259,11 +259,11 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
       const id = cipher.Identity ?? {}
       base.identity = {
         firstName: await dec(id.FirstName),
-        lastName:  await dec(id.LastName),
-        email:     await dec(id.Email),
-        phone:     await dec(id.Phone),
-        address1:  await dec(id.Address1),
-        company:   await dec(id.Company),
+        lastName: await dec(id.LastName),
+        email: await dec(id.Email),
+        phone: await dec(id.Phone),
+        address1: await dec(id.Address1),
+        company: await dec(id.Company),
       }
       break
     }
@@ -271,8 +271,8 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
 
   if (cipher.Fields?.length) {
     base.fields = await Promise.all(cipher.Fields.map(async f => ({
-      type:  f.Type,
-      name:  await dec(f.Name),
+      type: f.Type,
+      name: await dec(f.Name),
       value: await dec(f.Value),
     })))
   }

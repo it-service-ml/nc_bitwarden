@@ -261,13 +261,13 @@ const identityName = computed(() =>
     props.item.identity?.lastName,
   ]
     .filter(Boolean)
-    .join(' ')
+    .join(' '),
 )
 
 async function confirmDelete() {
   if (
     !confirm(
-      `"${props.item.name}" wirklich löschen?`
+      `"${props.item.name}" wirklich löschen?`,
     )
   ) {
     return
@@ -302,7 +302,7 @@ async function writeClipboard(value) {
 
 async function copyNotes() {
   const copied = await writeClipboard(
-    String(props.item.notes ?? '')
+    String(props.item.notes ?? ''),
   )
 
   notesMessage.value = copied

@@ -137,11 +137,11 @@ let messageTimer = null
 const rawValue = computed(() =>
   props.value === null || props.value === undefined
     ? ''
-    : String(props.value)
+    : String(props.value),
 )
 
 const hasValue = computed(() =>
-  rawValue.value.trim().length > 0
+  rawValue.value.trim().length > 0,
 )
 
 const displayValue = computed(() => {
@@ -158,7 +158,7 @@ const displayValue = computed(() => {
 
 const normalizedHref = computed(() => {
   const value = String(
-    props.href || ''
+    props.href || '',
   ).trim()
 
   if (!value) {
@@ -224,7 +224,7 @@ async function copyValue() {
   showMessage(
     copied
       ? `${props.label} wurde kopiert.`
-      : `${props.label} konnte nicht kopiert werden.`
+      : `${props.label} konnte nicht kopiert werden.`,
   )
 }
 

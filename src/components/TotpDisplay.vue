@@ -117,11 +117,11 @@ let refreshPending = false
 let requestRevision = 0
 
 const formattedCurrentCode = computed(() =>
-  formatCode(currentCode.value)
+  formatCode(currentCode.value),
 )
 
 const formattedNextCode = computed(() =>
-  formatCode(nextCode.value)
+  formatCode(nextCode.value),
 )
 
 const progressPercent = computed(() => {
@@ -156,7 +156,7 @@ function updateCountdown() {
   secondsRemaining.value = Math.max(
     0,
     Math.ceil(
-      (expiresAt.value - Date.now()) / 1000
+      (expiresAt.value - Date.now()) / 1000,
     ),
   )
 

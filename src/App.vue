@@ -114,13 +114,13 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import LockOutlineIcon      from 'vue-material-design-icons/LockOutline.vue'
-import LoginForm     from './components/LoginForm.vue'
-import VaultList     from './components/VaultList.vue'
-import VaultItems    from './components/VaultItems.vue'
-import ItemDetail    from './components/ItemDetail.vue'
-import ItemForm      from './components/ItemForm.vue'
-import FolderDialog  from './components/FolderDialog.vue'
+import LockOutlineIcon from 'vue-material-design-icons/LockOutline.vue'
+import LoginForm from './components/LoginForm.vue'
+import VaultList from './components/VaultList.vue'
+import VaultItems from './components/VaultItems.vue'
+import ItemDetail from './components/ItemDetail.vue'
+import ItemForm from './components/ItemForm.vue'
+import FolderDialog from './components/FolderDialog.vue'
 import CollectionDialog from './components/CollectionDialog.vue'
 import PasswordGeneratorDialog from './components/PasswordGeneratorDialog.vue'
 import { BitwardenApi } from './services/api.js'
@@ -137,34 +137,33 @@ import {
 // camelCase (Vaultwarden) → PascalCase (Bitwarden Cloud) Normalizer
 function toPascal(o) {
   if (Array.isArray(o)) return o.map(toPascal)
-  if (o !== null && typeof o === 'object')
-    return Object.fromEntries(Object.entries(o).map(([k, v]) => [k[0].toUpperCase() + k.slice(1), toPascal(v)]))
+  if (o !== null && typeof o === 'object') { return Object.fromEntries(Object.entries(o).map(([k, v]) => [k[0].toUpperCase() + k.slice(1), toPascal(v)])) }
   return o
 }
 
 const restoringSession = ref(true)
-const isLoggedIn   = ref(false)
+const isLoggedIn = ref(false)
 const vaultRevision = ref(0)
-const userKey      = ref(null)
-const items             = ref([])
-const folders           = ref([])
-const collections       = ref([])
-const organizations     = ref([])
-const organizationKeys  = ref({})
-const visibleItems      = ref([])
+const userKey = ref(null)
+const items = ref([])
+const folders = ref([])
+const collections = ref([])
+const organizations = ref([])
+const organizationKeys = ref({})
+const visibleItems = ref([])
 const activeFilterLabel = ref('Alle Einträge')
-const selectedItem      = ref(null)
-const loading      = ref(false)
-const showForm         = ref(false)
-const editItem         = ref(null)
-const showFolderDialog     = ref(false)
-const editFolder           = ref(null)
+const selectedItem = ref(null)
+const loading = ref(false)
+const showForm = ref(false)
+const editItem = ref(null)
+const showFolderDialog = ref(false)
+const editFolder = ref(null)
 const showCollectionDialog = ref(false)
-const editCollection       = ref(null)
+const editCollection = ref(null)
 const showPasswordGenerator = ref(false)
 
 async function onLoggedIn({ masterKey, keepUnlocked = true }) {
-  userKey.value    = masterKey
+  userKey.value = masterKey
   isLoggedIn.value = true
 
   if (keepUnlocked) {
@@ -202,7 +201,7 @@ async function loadVault() {
     if (sync.Profile?.PrivateKey && orgs.length > 0) {
       try {
         const rsaKey = await decryptRsaPrivateKey(sync.Profile.PrivateKey, userKey.value)
-        orgKeys      = await decryptOrgKeys(orgs, rsaKey)
+        orgKeys = await decryptOrgKeys(orgs, rsaKey)
         console.info(`[nc_bitwarden] ${Object.keys(orgKeys).length}/${orgs.length} Org-Keys entschlüsselt`)
       } catch (e) {
         console.warn('[nc_bitwarden] Org-Key Entschlüsselung fehlgeschlagen:', e.message)
@@ -214,9 +213,9 @@ async function loadVault() {
     // Ordner
     const folderResults = await Promise.allSettled(
       (sync.Folders ?? []).map(async f => ({
-        id:   f.Id,
+        id: f.Id,
         name: await decryptEncString(f.Name, userKey.value.encKey, userKey.value.macKey),
-      }))
+      })),
     )
     folders.value = folderResults
       .filter(result => result.status === 'fulfilled')
@@ -230,7 +229,7 @@ async function loadVault() {
 
         if (!orgKey) {
           throw new Error(
-            `Kein Organisationsschlüssel für Sammlung ${collection.Id}`
+            `Kein Organisationsschlüssel für Sammlung ${collection.Id}`,
           )
         }
 
@@ -250,7 +249,7 @@ async function loadVault() {
           manage: Boolean(collection.Manage),
           type: collection.Type ?? 0,
         }
-      })
+      }),
     )
 
     const failedCollections = collectionResults
@@ -258,7 +257,7 @@ async function loadVault() {
 
     if (failedCollections.length > 0) {
       console.warn(
-        `[nc_bitwarden] ${failedCollections.length} Sammlungen konnten nicht entschlüsselt werden`
+        `[nc_bitwarden] ${failedCollections.length} Sammlungen konnten nicht entschlüsselt werden`,
       )
     }
 
@@ -268,7 +267,7 @@ async function loadVault() {
 
     // Ciphers – ein Fehler killt nicht alle anderen
     const cipherResults = await Promise.allSettled(
-      (sync.Ciphers ?? []).map(c => decryptCipher(c, userKey.value, orgKeys))
+      (sync.Ciphers ?? []).map(c => decryptCipher(c, userKey.value, orgKeys)),
     )
     const failed = cipherResults.filter(r => r.status === 'rejected').length
     if (failed > 0) console.warn(`[nc_bitwarden] ${failed} Einträge konnten nicht entschlüsselt werden`)
@@ -280,10 +279,9 @@ async function loadVault() {
     activeFilterLabel.value = 'Alle Einträge'
     vaultRevision.value += 1
 
-
     console.info(
       `[nc_bitwarden] Vault geladen: ${items.value.length} Einträge, `
-      + `${folders.value.length} Ordner, ${collections.value.length} Sammlungen`
+      + `${folders.value.length} Ordner, ${collections.value.length} Sammlungen`,
     )
     return true
   } catch (e) {
@@ -357,8 +355,8 @@ async function reloadVaultAndReset(selectedId = null) {
 
   selectedItem.value = normalizedSelectedId
     ? items.value.find(item =>
-        normalizeId(item.id) === normalizedSelectedId
-      ) ?? null
+      normalizeId(item.id) === normalizedSelectedId,
+    ) ?? null
     : null
 
   return true
@@ -399,7 +397,7 @@ function canCreateCollectionsForOrg(org) {
         Boolean(org.AccessAll ?? org.accessAll)
         || Boolean(
           permissions.CreateNewCollections
-          ?? permissions.createNewCollections
+          ?? permissions.createNewCollections,
         )
       )
     )
@@ -408,7 +406,7 @@ function canCreateCollectionsForOrg(org) {
 
 function organizationForId(organizationId) {
   return organizations.value.find(org =>
-    normalizeId(org.id) === normalizeId(organizationId)
+    normalizeId(org.id) === normalizeId(organizationId),
   )
 }
 
@@ -426,14 +424,14 @@ function decorateCollection(collection) {
       || Boolean(collection.manage)
       || Boolean(
         permissions.EditAnyCollection
-        ?? permissions.editAnyCollection
+        ?? permissions.editAnyCollection,
       ),
     canDelete:
       ownerOrAdmin
       || Boolean(collection.manage)
       || Boolean(
         permissions.DeleteAnyCollection
-        ?? permissions.deleteAnyCollection
+        ?? permissions.deleteAnyCollection,
       ),
   }
 }
@@ -445,7 +443,7 @@ function collectionDescendants(collection) {
     normalizeId(candidate.organizationId)
       === normalizeId(collection.organizationId)
     && normalizeId(candidate.id) !== normalizeId(collection.id)
-    && String(candidate.name).startsWith(prefix)
+    && String(candidate.name).startsWith(prefix),
   )
 }
 
@@ -466,7 +464,7 @@ async function onFolderSaved() {
 
 async function deleteFolder(folder) {
   const count = items.value.filter(item =>
-    normalizeId(item.folderId) === normalizeId(folder.id)
+    normalizeId(item.folderId) === normalizeId(folder.id),
   ).length
 
   const message = count > 0
@@ -481,13 +479,13 @@ async function deleteFolder(folder) {
     await BitwardenApi.deleteFolder(folder.id)
 
     folders.value = folders.value.filter(candidate =>
-      normalizeId(candidate.id) !== normalizeId(folder.id)
+      normalizeId(candidate.id) !== normalizeId(folder.id),
     )
 
     items.value = items.value.map(item =>
       normalizeId(item.folderId) === normalizeId(folder.id)
         ? { ...item, folderId: null }
-        : item
+        : item,
     )
 
     if (
@@ -505,7 +503,7 @@ async function deleteFolder(folder) {
     console.error('[nc_bitwarden] Ordner konnte nicht gelöscht werden:', exception)
     alert(
       exception?.response?.data?.error
-      || 'Der Ordner konnte nicht gelöscht werden.'
+      || 'Der Ordner konnte nicht gelöscht werden.',
     )
   }
 }
@@ -531,15 +529,15 @@ async function deleteCollection(collection) {
   if (descendants.length > 0) {
     alert(
       `Die Sammlung besitzt ${descendants.length} untergeordnete `
-      + 'Sammlungen und kann deshalb noch nicht gelöscht werden.'
+      + 'Sammlungen und kann deshalb noch nicht gelöscht werden.',
     )
     return
   }
 
   const affectedItems = items.value.filter(item =>
     (item.collectionIds ?? []).some(collectionId =>
-      normalizeId(collectionId) === normalizeId(collection.id)
-    )
+      normalizeId(collectionId) === normalizeId(collection.id),
+    ),
   ).length
 
   const message = affectedItems > 0
@@ -559,13 +557,13 @@ async function deleteCollection(collection) {
     )
 
     collections.value = collections.value.filter(candidate =>
-      normalizeId(candidate.id) !== normalizeId(collection.id)
+      normalizeId(candidate.id) !== normalizeId(collection.id),
     )
 
     items.value = items.value.map(item => ({
       ...item,
       collectionIds: (item.collectionIds ?? []).filter(collectionId =>
-        normalizeId(collectionId) !== normalizeId(collection.id)
+        normalizeId(collectionId) !== normalizeId(collection.id),
       ),
     }))
 
@@ -575,7 +573,7 @@ async function deleteCollection(collection) {
         collectionIds:
           (selectedItem.value.collectionIds ?? [])
             .filter(collectionId =>
-              normalizeId(collectionId) !== normalizeId(collection.id)
+              normalizeId(collectionId) !== normalizeId(collection.id),
             ),
       }
     }
@@ -594,7 +592,7 @@ async function deleteCollection(collection) {
 
     alert(
       exception?.response?.data?.error
-      || 'Die Sammlung konnte nicht gelöscht werden.'
+      || 'Die Sammlung konnte nicht gelöscht werden.',
     )
   }
 }
@@ -615,7 +613,7 @@ async function deleteItem(item) {
 
     alert(
       exception?.response?.data?.error
-      || 'Der Eintrag konnte nicht gelöscht werden.'
+      || 'Der Eintrag konnte nicht gelöscht werden.',
     )
   }
 }
@@ -628,8 +626,8 @@ async function onSaved(item) {
   await reloadVaultAndReset(item.id)
 }
 
-function openNewForm()     { editItem.value = null; showForm.value = true; selectedItem.value = null }
-function openEditForm(item){ editItem.value = item; showForm.value = true }
+function openNewForm() { editItem.value = null; showForm.value = true; selectedItem.value = null }
+function openEditForm(item) { editItem.value = item; showForm.value = true }
 </script>
 
 <style scoped>

@@ -14,7 +14,7 @@ function normalizeAlgorithm(value) {
       return 'SHA-512'
     default:
       throw new Error(
-        `Nicht unterstützter TOTP-Algorithmus: ${value}`
+        `Nicht unterstützter TOTP-Algorithmus: ${value}`,
       )
   }
 }
@@ -47,7 +47,7 @@ function decodeBase32(value) {
 
     if (index < 0) {
       throw new Error(
-        `Ungültiges Zeichen im TOTP-Secret: ${character}`
+        `Ungültiges Zeichen im TOTP-Secret: ${character}`,
       )
     }
 
@@ -102,7 +102,7 @@ export function parseTotpValue(value) {
     || url.hostname.toLowerCase() !== 'totp'
   ) {
     throw new Error(
-      'Nur standardmäßige otpauth://totp/-Einträge werden unterstützt.'
+      'Nur standardmäßige otpauth://totp/-Einträge werden unterstützt.',
     )
   }
 
@@ -110,14 +110,14 @@ export function parseTotpValue(value) {
 
   if (!secret) {
     throw new Error(
-      'Die TOTP-URL enthält kein Secret.'
+      'Die TOTP-URL enthält kein Secret.',
     )
   }
 
   return {
     secret,
     algorithm: normalizeAlgorithm(
-      url.searchParams.get('algorithm')
+      url.searchParams.get('algorithm'),
     ),
     digits: normalizeInteger(
       url.searchParams.get('digits'),
@@ -152,14 +152,14 @@ async function generateHotp(key, counter, digits) {
       'HMAC',
       key,
       counterToBytes(counter),
-    )
+    ),
   )
 
   const offset = digest[digest.length - 1] & 0x0f
 
   if (offset + 3 >= digest.length) {
     throw new Error(
-      'Der erzeugte TOTP-Prüfwert ist ungültig.'
+      'Der erzeugte TOTP-Prüfwert ist ungültig.',
     )
   }
 

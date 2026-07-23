@@ -256,7 +256,7 @@ async function copyPassword() {
   try {
     await navigator.clipboard.writeText(props.modelValue)
     message.value = 'Passwort wurde kopiert.'
-    return
+
   } catch {
     const textarea = document.createElement('textarea')
 
