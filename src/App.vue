@@ -14,18 +14,22 @@
       <!-- Linke Sidebar: Vault-Liste -->
       <aside class="bw-layout__sidebar">
         <VaultList
+          :key="vaultRevision"
           :items="items"
           :folders="folders"
           :collections="collections"
+          :organizations="organizations"
           :selected-id="selectedItem?.id"
           @select="selectedItem = $event; showForm = false"
-          @new="openNewForm"
           @logout="logout"
           @filter-change="onFilterChange"
           @navigate="showVaultList"
           @create-folder="openFolderDialog()"
           @edit-folder="openFolderDialog($event)"
           @delete-folder="deleteFolder"
+          @create-collection="openCollectionDialog()"
+          @edit-collection="openCollectionDialog($event)"
+          @delete-collection="deleteCollection"
         />
       </aside>
 
@@ -35,11 +39,14 @@
           :items="visibleItems"
           :title="activeFilterLabel"
           :selected-id="selectedItem?.id"
+          @new="openNewForm"
           @select="
             selectedItem = $event;
             showForm = false;
             editItem = null
           "
+          @edit="openEditForm"
+          @delete="deleteItem"
         />
       </section>
 
@@ -63,6 +70,9 @@
           :item="editItem"
           :user-key="userKey"
           :folders="folders"
+          :collections="collections"
+          :organizations="organizations"
+          :organization-keys="organizationKeys"
           @close="showForm = false; editItem = null"
           @saved="onSaved"
         />
@@ -82,6 +92,16 @@
       @close="closeFolderDialog"
       @saved="onFolderSaved"
     />
+
+    <CollectionDialog
+      v-if="showCollectionDialog"
+      :collection="editCollection"
+      :collections="collections"
+      :organizations="organizations"
+      :organization-keys="organizationKeys"
+      @close="closeCollectionDialog"
+      @saved="onCollectionSaved"
+    />
   </div>
 </template>
 
@@ -95,6 +115,7 @@ import VaultItems    from './components/VaultItems.vue'
 import ItemDetail    from './components/ItemDetail.vue'
 import ItemForm      from './components/ItemForm.vue'
 import FolderDialog  from './components/FolderDialog.vue'
+import CollectionDialog from './components/CollectionDialog.vue'
 import { BitwardenApi } from './services/api.js'
 import {
   decryptCipher, decryptEncString,
@@ -116,18 +137,23 @@ function toPascal(o) {
 
 const restoringSession = ref(true)
 const isLoggedIn   = ref(false)
+const vaultRevision = ref(0)
 const userKey      = ref(null)
 const items             = ref([])
 const folders           = ref([])
 const collections       = ref([])
+const organizations     = ref([])
+const organizationKeys  = ref({})
 const visibleItems      = ref([])
 const activeFilterLabel = ref('Alle Einträge')
 const selectedItem      = ref(null)
 const loading      = ref(false)
 const showForm         = ref(false)
 const editItem         = ref(null)
-const showFolderDialog = ref(false)
-const editFolder       = ref(null)
+const showFolderDialog     = ref(false)
+const editFolder           = ref(null)
+const showCollectionDialog = ref(false)
+const editCollection       = ref(null)
 
 async function onLoggedIn({ masterKey, keepUnlocked = true }) {
   userKey.value    = masterKey
@@ -155,6 +181,16 @@ async function loadVault() {
     // Org-Keys via RSA entschlüsseln
     let orgKeys = {}
     const orgs = sync.Profile?.Organizations ?? []
+
+    organizations.value = orgs.map(org => ({
+      id: org.Id,
+      name: org.Name || org.Identifier || org.Id,
+      type: Number(org.Type),
+      accessAll: Boolean(org.AccessAll),
+      permissions: org.Permissions ?? {},
+      canCreateCollections: canCreateCollectionsForOrg(org),
+    }))
+
     if (sync.Profile?.PrivateKey && orgs.length > 0) {
       try {
         const rsaKey = await decryptRsaPrivateKey(sync.Profile.PrivateKey, userKey.value)
@@ -164,6 +200,8 @@ async function loadVault() {
         console.warn('[nc_bitwarden] Org-Key Entschlüsselung fehlgeschlagen:', e.message)
       }
     }
+
+    organizationKeys.value = orgKeys
 
     // Ordner
     const folderResults = await Promise.allSettled(
@@ -218,7 +256,7 @@ async function loadVault() {
 
     collections.value = collectionResults
       .filter(result => result.status === 'fulfilled')
-      .map(result => result.value)
+      .map(result => decorateCollection(result.value))
 
     // Ciphers – ein Fehler killt nicht alle anderen
     const cipherResults = await Promise.allSettled(
@@ -226,7 +264,14 @@ async function loadVault() {
     )
     const failed = cipherResults.filter(r => r.status === 'rejected').length
     if (failed > 0) console.warn(`[nc_bitwarden] ${failed} Einträge konnten nicht entschlüsselt werden`)
-    items.value = cipherResults.filter(r => r.status === 'fulfilled').map(r => r.value)
+    items.value = cipherResults
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value)
+
+    visibleItems.value = [...items.value]
+    activeFilterLabel.value = 'Alle Einträge'
+    vaultRevision.value += 1
+
 
     console.info(
       `[nc_bitwarden] Vault geladen: ${items.value.length} Einträge, `
@@ -247,6 +292,8 @@ function resetVaultState() {
   items.value = []
   folders.value = []
   collections.value = []
+  organizations.value = []
+  organizationKeys.value = {}
   visibleItems.value = []
   activeFilterLabel.value = 'Alle Einträge'
   selectedItem.value = null
@@ -254,6 +301,8 @@ function resetVaultState() {
   editItem.value = null
   showFolderDialog.value = false
   editFolder.value = null
+  showCollectionDialog.value = false
+  editCollection.value = null
 }
 
 function logout() {
@@ -283,6 +332,29 @@ onMounted(async () => {
   }
 })
 
+async function reloadVaultAndReset(selectedId = null) {
+  const loaded = await loadVault()
+
+  if (!loaded) {
+    clearSessionKey()
+    resetVaultState()
+    return false
+  }
+
+  showForm.value = false
+  editItem.value = null
+
+  const normalizedSelectedId = normalizeId(selectedId)
+
+  selectedItem.value = normalizedSelectedId
+    ? items.value.find(item =>
+        normalizeId(item.id) === normalizedSelectedId
+      ) ?? null
+    : null
+
+  return true
+}
+
 function onFilterChange({ items: filteredItems, label }) {
   visibleItems.value = Array.isArray(filteredItems)
     ? filteredItems
@@ -305,6 +377,69 @@ function normalizeId(value) {
   return String(value).trim().toLowerCase()
 }
 
+function canCreateCollectionsForOrg(org) {
+  const type = Number(org.Type ?? org.type)
+  const permissions = org.Permissions ?? org.permissions ?? {}
+
+  return (
+    type === 0
+    || type === 1
+    || (
+      (type === 3 || type === 4)
+      && (
+        Boolean(org.AccessAll ?? org.accessAll)
+        || Boolean(
+          permissions.CreateNewCollections
+          ?? permissions.createNewCollections
+        )
+      )
+    )
+  )
+}
+
+function organizationForId(organizationId) {
+  return organizations.value.find(org =>
+    normalizeId(org.id) === normalizeId(organizationId)
+  )
+}
+
+function decorateCollection(collection) {
+  const organization = organizationForId(collection.organizationId)
+  const type = Number(organization?.type)
+  const permissions = organization?.permissions ?? {}
+
+  const ownerOrAdmin = type === 0 || type === 1
+
+  return {
+    ...collection,
+    canManage:
+      ownerOrAdmin
+      || Boolean(collection.manage)
+      || Boolean(
+        permissions.EditAnyCollection
+        ?? permissions.editAnyCollection
+      ),
+    canDelete:
+      ownerOrAdmin
+      || Boolean(collection.manage)
+      || Boolean(
+        permissions.DeleteAnyCollection
+        ?? permissions.deleteAnyCollection
+      ),
+  }
+}
+
+function collectionDescendants(collection) {
+  const prefix = `${String(collection.name).replace(/\/+$/, '')}/`
+
+  return collections.value.filter(candidate =>
+    normalizeId(candidate.organizationId)
+      === normalizeId(collection.organizationId)
+    && normalizeId(candidate.id) !== normalizeId(collection.id)
+    && String(candidate.name).startsWith(prefix)
+  )
+}
+
 function openFolderDialog(folder = null) {
   editFolder.value = folder
   showFolderDialog.value = true
@@ -315,21 +450,9 @@ function closeFolderDialog() {
   editFolder.value = null
 }
 
-function onFolderSaved(folder) {
-  const folderId = normalizeId(folder.id)
-  const index = folders.value.findIndex(candidate =>
-    normalizeId(candidate.id) === folderId
-  )
-
-  if (index >= 0) {
-    folders.value = folders.value.map((candidate, candidateIndex) =>
-      candidateIndex === index ? folder : candidate
-    )
-  } else {
-    folders.value = [...folders.value, folder]
-  }
-
+async function onFolderSaved() {
   closeFolderDialog()
+  await reloadVaultAndReset()
 }
 
 async function deleteFolder(folder) {
@@ -367,6 +490,8 @@ async function deleteFolder(folder) {
         folderId: null,
       }
     }
+
+    await reloadVaultAndReset()
   } catch (exception) {
     console.error('[nc_bitwarden] Ordner konnte nicht gelöscht werden:', exception)
     alert(
@@ -376,15 +501,124 @@ async function deleteFolder(folder) {
   }
 }
 
-function onDelete(id)      { items.value = items.value.filter(i => i.id !== id); selectedItem.value = null }
-function onSaved(item)     {
-  const idx = items.value.findIndex(i => i.id === item.id)
-  if (idx >= 0) items.value[idx] = item
-  else          items.value.push(item)
-  selectedItem.value = item
-  showForm.value     = false
-  editItem.value     = null
+function openCollectionDialog(collection = null) {
+  editCollection.value = collection
+  showCollectionDialog.value = true
 }
+
+function closeCollectionDialog() {
+  showCollectionDialog.value = false
+  editCollection.value = null
+}
+
+async function onCollectionSaved() {
+  closeCollectionDialog()
+  await reloadVaultAndReset()
+}
+
+async function deleteCollection(collection) {
+  const descendants = collectionDescendants(collection)
+
+  if (descendants.length > 0) {
+    alert(
+      `Die Sammlung besitzt ${descendants.length} untergeordnete `
+      + 'Sammlungen und kann deshalb noch nicht gelöscht werden.'
+    )
+    return
+  }
+
+  const affectedItems = items.value.filter(item =>
+    (item.collectionIds ?? []).some(collectionId =>
+      normalizeId(collectionId) === normalizeId(collection.id)
+    )
+  ).length
+
+  const message = affectedItems > 0
+    ? `Sammlung "${collection.name}" wirklich löschen?\n\n`
+      + `${affectedItems} Einträge bleiben erhalten. `
+      + 'Nur die Zuordnung zu dieser Sammlung wird entfernt.'
+    : `Sammlung "${collection.name}" wirklich löschen?`
+
+  if (!confirm(message)) {
+    return
+  }
+
+  try {
+    await BitwardenApi.deleteCollection(
+      collection.organizationId,
+      collection.id,
+    )
+
+    collections.value = collections.value.filter(candidate =>
+      normalizeId(candidate.id) !== normalizeId(collection.id)
+    )
+
+    items.value = items.value.map(item => ({
+      ...item,
+      collectionIds: (item.collectionIds ?? []).filter(collectionId =>
+        normalizeId(collectionId) !== normalizeId(collection.id)
+      ),
+    }))
+
+    if (selectedItem.value) {
+      selectedItem.value = {
+        ...selectedItem.value,
+        collectionIds:
+          (selectedItem.value.collectionIds ?? [])
+            .filter(collectionId =>
+              normalizeId(collectionId) !== normalizeId(collection.id)
+            ),
+      }
+    }
+
+    // Nach dem Löschen darf kein Filter auf der nicht mehr existierenden
+    // Sammlung verbleiben.
+    visibleItems.value = [...items.value]
+    activeFilterLabel.value = 'Alle Einträge'
+
+    await reloadVaultAndReset()
+  } catch (exception) {
+    console.error(
+      '[nc_bitwarden] Sammlung konnte nicht gelöscht werden:',
+      exception,
+    )
+
+    alert(
+      exception?.response?.data?.error
+      || 'Die Sammlung konnte nicht gelöscht werden.'
+    )
+  }
+}
+
+async function deleteItem(item) {
+  if (!confirm(`"${item.name}" wirklich löschen?`)) {
+    return
+  }
+
+  try {
+    await BitwardenApi.deleteCipher(item.id)
+    onDelete(item.id)
+  } catch (exception) {
+    console.error(
+      '[nc_bitwarden] Eintrag konnte nicht gelöscht werden:',
+      exception,
+    )
+
+    alert(
+      exception?.response?.data?.error
+      || 'Der Eintrag konnte nicht gelöscht werden.'
+    )
+  }
+}
+
+async function onDelete() {
+  await reloadVaultAndReset()
+}
+
+async function onSaved(item) {
+  await reloadVaultAndReset(item.id)
+}
+
 function openNewForm()     { editItem.value = null; showForm.value = true; selectedItem.value = null }
 function openEditForm(item){ editItem.value = item; showForm.value = true }
 </script>
@@ -406,17 +640,18 @@ function openEditForm(item){ editItem.value = item; showForm.value = true }
   color: var(--color-text-maxcontrast);
 }
 
-/* ── Zweispaltiges Layout ── */
+/* ── Dreispaltiges Layout ── */
 .bw-layout {
   display:    flex;
   height:     100%;
-  overflow:   hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .bw-layout__sidebar {
-  width:         320px;
-  min-width:     280px;
-  max-width:     380px;
+  width:         400px;
+  min-width:     400px;
+  max-width:     400px;
   flex-shrink:   0;
   border-right:  1px solid var(--color-border);
   overflow:      hidden;
@@ -426,9 +661,9 @@ function openEditForm(item){ editItem.value = item; showForm.value = true }
 }
 
 .bw-layout__items {
-  width:         380px;
-  min-width:     320px;
-  max-width:     460px;
+  width:         400px;
+  min-width:     400px;
+  max-width:     400px;
   flex-shrink:   0;
   overflow:      hidden;
   border-right:  1px solid var(--color-border);
@@ -436,6 +671,7 @@ function openEditForm(item){ editItem.value = item; showForm.value = true }
 }
 
 .bw-layout__main {
+  min-width:      480px;
   flex:           1;
   overflow-y:     auto;
   /* Hintergrund identisch zur Sidebar – einheitliches Erscheinungsbild */
