@@ -2,7 +2,7 @@
 
 namespace OCA\NcBitwarden\Controller;
 
-use OCA\NcBitwarden\Service\BitwardenProxyService;
+use OCA\NcBitwarden\Service\VaultwardenProxyService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\BruteForceProtection;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -10,11 +10,11 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
 
-final class BitwardenApiController extends Controller {
+final class VaultwardenApiController extends Controller {
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		private BitwardenProxyService $proxyService,
+		private VaultwardenProxyService $proxyService,
 		private LoggerInterface $logger,
 		private string $userId,
 	) {

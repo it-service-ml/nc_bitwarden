@@ -16,8 +16,12 @@
           v-if="secret && hasValue"
           type="button"
           class="bw-field-card__action"
-          :title="revealed ? 'Wert ausblenden' : 'Wert anzeigen'"
-          :aria-label="revealed ? 'Wert ausblenden' : 'Wert anzeigen'"
+          :title="revealed
+            ? t('nc_bitwarden', 'Hide value')
+            : t('nc_bitwarden', 'Show value')"
+          :aria-label="revealed
+            ? t('nc_bitwarden', 'Hide value')
+            : t('nc_bitwarden', 'Show value')"
           @click="revealed = !revealed"
         >
           <EyeOffOutlineIcon
@@ -37,8 +41,8 @@
           :href="normalizedHref"
           target="_blank"
           rel="noopener noreferrer"
-          title="In neuem Tab öffnen"
-          aria-label="In neuem Tab öffnen"
+          :title="t('nc_bitwarden', 'Open in new tab')"
+          :aria-label="t('nc_bitwarden', 'Open in new tab')"
         >
           <OpenInNewIcon :size="18" />
         </a>
@@ -47,8 +51,8 @@
           v-if="copyable && hasValue"
           type="button"
           class="bw-field-card__action"
-          title="In die Zwischenablage kopieren"
-          aria-label="In die Zwischenablage kopieren"
+          :title="t('nc_bitwarden', 'Copy to clipboard')"
+          :aria-label="t('nc_bitwarden', 'Copy to clipboard')"
           @click="copyValue"
         >
           <ContentCopyIcon :size="18" />
@@ -94,6 +98,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { t } from '@nextcloud/l10n'
 import EyeOutlineIcon from 'vue-material-design-icons/EyeOutline.vue'
 import EyeOffOutlineIcon from 'vue-material-design-icons/EyeOffOutline.vue'
 import ContentCopyIcon from 'vue-material-design-icons/ContentCopy.vue'
@@ -146,7 +151,7 @@ const hasValue = computed(() =>
 
 const displayValue = computed(() => {
   if (!hasValue.value) {
-    return 'Nicht hinterlegt'
+    return t('nc_bitwarden', 'Not provided')
   }
 
   if (props.secret && !revealed.value) {
@@ -223,8 +228,16 @@ async function copyValue() {
 
   showMessage(
     copied
-      ? `${props.label} wurde kopiert.`
-      : `${props.label} konnte nicht kopiert werden.`,
+      ? t(
+        'nc_bitwarden',
+        '{label} was copied.',
+        { label: props.label },
+      )
+      : t(
+        'nc_bitwarden',
+        '{label} could not be copied.',
+        { label: props.label },
+      ),
   )
 }
 

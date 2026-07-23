@@ -2,7 +2,7 @@
   <div class="bw-app">
     <div v-if="restoringSession" class="bw-session-restore">
       <NcLoadingIcon :size="48" />
-      <p>Tresor-Sitzung wird wiederhergestellt…</p>
+      <p>{{ t('nc_bitwarden', 'Restoring vault session…') }}</p>
     </div>
 
     <LoginForm
@@ -55,7 +55,7 @@
       <main class="bw-layout__main">
         <div v-if="loading" class="bw-main__loading">
           <NcLoadingIcon :size="48" />
-          <p>Vault wird entschlüsselt…</p>
+          <p>{{ t('nc_bitwarden', 'Decrypting vault…') }}</p>
         </div>
 
         <ItemDetail
@@ -80,8 +80,13 @@
 
         <div v-else class="bw-main__empty">
           <LockOutlineIcon :size="56" />
-          <h3>Tresor entsperrt</h3>
-          <p>Wähle einen Eintrag aus der mittleren Spalte.</p>
+          <h3>{{ t('nc_bitwarden', 'Vault unlocked') }}</h3>
+          <p>
+            {{ t(
+              'nc_bitwarden',
+              'Select an item from the middle column.',
+            ) }}
+          </p>
         </div>
       </main>
     </div>
@@ -113,6 +118,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import LockOutlineIcon from 'vue-material-design-icons/LockOutline.vue'
 import LoginForm from './components/LoginForm.vue'
@@ -123,7 +129,7 @@ import ItemForm from './components/ItemForm.vue'
 import FolderDialog from './components/FolderDialog.vue'
 import CollectionDialog from './components/CollectionDialog.vue'
 import PasswordGeneratorDialog from './components/PasswordGeneratorDialog.vue'
-import { BitwardenApi } from './services/api.js'
+import { VaultwardenApi } from './services/api.js'
 import {
   decryptCipher, decryptEncString,
   decryptRsaPrivateKey, decryptOrgKeys,
@@ -151,7 +157,9 @@ const collections = ref([])
 const organizations = ref([])
 const organizationKeys = ref({})
 const visibleItems = ref([])
-const activeFilterLabel = ref('Alle Einträge')
+const activeFilterLabel = ref(
+  t('nc_bitwarden', 'All items'),
+)
 const selectedItem = ref(null)
 const loading = ref(false)
 const showForm = ref(false)
@@ -183,7 +191,7 @@ async function onLoggedIn({ masterKey, keepUnlocked = true }) {
 async function loadVault() {
   loading.value = true
   try {
-    const sync = toPascal(await BitwardenApi.sync())
+    const sync = toPascal(await VaultwardenApi.sync())
 
     // Org-Keys via RSA entschlüsseln
     let orgKeys = {}
@@ -276,7 +284,7 @@ async function loadVault() {
       .map(result => result.value)
 
     visibleItems.value = [...items.value]
-    activeFilterLabel.value = 'Alle Einträge'
+    activeFilterLabel.value = t('nc_bitwarden', 'All items')
     vaultRevision.value += 1
 
     console.info(
@@ -301,7 +309,7 @@ function resetVaultState() {
   organizations.value = []
   organizationKeys.value = {}
   visibleItems.value = []
-  activeFilterLabel.value = 'Alle Einträge'
+  activeFilterLabel.value = t('nc_bitwarden', 'All items')
   selectedItem.value = null
   showForm.value = false
   editItem.value = null
@@ -367,7 +375,8 @@ function onFilterChange({ items: filteredItems, label }) {
     ? filteredItems
     : []
 
-  activeFilterLabel.value = label || 'Alle Einträge'
+  activeFilterLabel.value = label
+    || t('nc_bitwarden', 'All items')
 }
 
 function showVaultList() {
@@ -467,16 +476,29 @@ async function deleteFolder(folder) {
     normalizeId(item.folderId) === normalizeId(folder.id),
   ).length
 
+  const folderPrompt = t(
+    'nc_bitwarden',
+    'Really delete folder {name}?',
+    { name: folder.name },
+  )
+
   const message = count > 0
-    ? `Ordner "${folder.name}" wirklich löschen?\n\n${count} Einträge werden danach unter "Ohne persönlichen Ordner" angezeigt.`
-    : `Ordner "${folder.name}" wirklich löschen?`
+    ? [
+      folderPrompt,
+      t(
+        'nc_bitwarden',
+        '{count} entries will then be shown without a personal folder.',
+        { count },
+      ),
+    ].join('\n\n')
+    : folderPrompt
 
   if (!confirm(message)) {
     return
   }
 
   try {
-    await BitwardenApi.deleteFolder(folder.id)
+    await VaultwardenApi.deleteFolder(folder.id)
 
     folders.value = folders.value.filter(candidate =>
       normalizeId(candidate.id) !== normalizeId(folder.id),
@@ -503,7 +525,10 @@ async function deleteFolder(folder) {
     console.error('[nc_bitwarden] Ordner konnte nicht gelöscht werden:', exception)
     alert(
       exception?.response?.data?.error
-      || 'Der Ordner konnte nicht gelöscht werden.',
+      || t(
+        'nc_bitwarden',
+        'The folder could not be deleted.',
+      ),
     )
   }
 }
@@ -528,8 +553,11 @@ async function deleteCollection(collection) {
 
   if (descendants.length > 0) {
     alert(
-      `Die Sammlung besitzt ${descendants.length} untergeordnete `
-      + 'Sammlungen und kann deshalb noch nicht gelöscht werden.',
+      t(
+        'nc_bitwarden',
+        'This collection has {count} subcollections and therefore cannot be deleted yet.',
+        { count: descendants.length },
+      ),
     )
     return
   }
@@ -540,18 +568,29 @@ async function deleteCollection(collection) {
     ),
   ).length
 
+  const collectionPrompt = t(
+    'nc_bitwarden',
+    'Really delete collection {name}?',
+    { name: collection.name },
+  )
+
   const message = affectedItems > 0
-    ? `Sammlung "${collection.name}" wirklich löschen?\n\n`
-      + `${affectedItems} Einträge bleiben erhalten. `
-      + 'Nur die Zuordnung zu dieser Sammlung wird entfernt.'
-    : `Sammlung "${collection.name}" wirklich löschen?`
+    ? [
+      collectionPrompt,
+      t(
+        'nc_bitwarden',
+        '{count} entries will be kept. Only their assignment to this collection will be removed.',
+        { count: affectedItems },
+      ),
+    ].join('\n\n')
+    : collectionPrompt
 
   if (!confirm(message)) {
     return
   }
 
   try {
-    await BitwardenApi.deleteCollection(
+    await VaultwardenApi.deleteCollection(
       collection.organizationId,
       collection.id,
     )
@@ -581,7 +620,7 @@ async function deleteCollection(collection) {
     // Nach dem Löschen darf kein Filter auf der nicht mehr existierenden
     // Sammlung verbleiben.
     visibleItems.value = [...items.value]
-    activeFilterLabel.value = 'Alle Einträge'
+    activeFilterLabel.value = t('nc_bitwarden', 'All items')
 
     await reloadVaultAndReset()
   } catch (exception) {
@@ -592,18 +631,27 @@ async function deleteCollection(collection) {
 
     alert(
       exception?.response?.data?.error
-      || 'Die Sammlung konnte nicht gelöscht werden.',
+      || t(
+        'nc_bitwarden',
+        'The collection could not be deleted.',
+      ),
     )
   }
 }
 
 async function deleteItem(item) {
-  if (!confirm(`"${item.name}" wirklich löschen?`)) {
+  if (!confirm(
+    t(
+      'nc_bitwarden',
+      'Really delete item {name}?',
+      { name: item.name },
+    ),
+  )) {
     return
   }
 
   try {
-    await BitwardenApi.deleteCipher(item.id)
+    await VaultwardenApi.deleteCipher(item.id)
     onDelete(item.id)
   } catch (exception) {
     console.error(
@@ -613,7 +661,10 @@ async function deleteItem(item) {
 
     alert(
       exception?.response?.data?.error
-      || 'Der Eintrag konnte nicht gelöscht werden.',
+      || t(
+        'nc_bitwarden',
+        'The item could not be deleted.',
+      ),
     )
   }
 }

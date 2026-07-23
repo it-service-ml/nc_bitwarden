@@ -2,8 +2,10 @@
   <section class="bw-items-panel">
     <header class="bw-items-panel__header">
       <div class="bw-items-panel__heading">
-        <span class="bw-items-panel__eyebrow">Einträge</span>
-        <h2 :title="title">{{ title }}</h2>
+        <span class="bw-items-panel__eyebrow">
+          {{ t('nc_bitwarden', 'Items') }}
+        </span>
+        <h2 :title="displayTitle">{{ displayTitle }}</h2>
       </div>
 
       <div class="bw-items-panel__header-actions">
@@ -14,8 +16,8 @@
         <button
           type="button"
           class="bw-items-panel__new"
-          title="Neuen Eintrag erstellen"
-          aria-label="Neuen Eintrag erstellen"
+          :title="t('nc_bitwarden', 'Create new item')"
+          :aria-label="t('nc_bitwarden', 'Create new item')"
           @click="$emit('new')"
         >
           <PlusIcon :size="20" />
@@ -50,8 +52,8 @@
           />
 
           <span class="bw-items-panel__content">
-            <strong :title="item.name || '(kein Name)'">
-              {{ item.name || '(kein Name)' }}
+            <strong :title="itemName(item)">
+              {{ itemName(item) }}
             </strong>
 
             <small
@@ -66,7 +68,7 @@
             v-if="item.favorite"
             :size="16"
             class="bw-items-panel__favorite"
-            title="Favorit"
+            :title="t('nc_bitwarden', 'Favorite')"
           />
         </button>
 
@@ -74,8 +76,16 @@
           <button
             type="button"
             class="bw-items-panel__action"
-            :title="`${item.name} bearbeiten`"
-            :aria-label="`${item.name} bearbeiten`"
+            :title="t(
+              'nc_bitwarden',
+              'Edit {name}',
+              { name: itemName(item) },
+            )"
+            :aria-label="t(
+              'nc_bitwarden',
+              'Edit {name}',
+              { name: itemName(item) },
+            )"
             @click.stop="$emit('edit', item)"
           >
             <PencilOutlineIcon :size="17" />
@@ -84,8 +94,16 @@
           <button
             type="button"
             class="bw-items-panel__action"
-            :title="`${item.name} löschen`"
-            :aria-label="`${item.name} löschen`"
+            :title="t(
+              'nc_bitwarden',
+              'Delete {name}',
+              { name: itemName(item) },
+            )"
+            :aria-label="t(
+              'nc_bitwarden',
+              'Delete {name}',
+              { name: itemName(item) },
+            )"
             @click.stop="$emit('delete', item)"
           >
             <DeleteOutlineIcon :size="17" />
@@ -99,14 +117,22 @@
       class="bw-items-panel__empty"
     >
       <LockOutlineIcon :size="38" />
-      <strong>Keine Einträge</strong>
-      <span>Für diese Auswahl wurden keine Einträge gefunden.</span>
+      <strong>
+        {{ t('nc_bitwarden', 'No items') }}
+      </strong>
+      <span>
+        {{ t(
+          'nc_bitwarden',
+          'No items were found for this selection.',
+        ) }}
+      </span>
     </div>
   </section>
 </template>
 
 <script setup>
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { t } from '@nextcloud/l10n'
 import ViewListOutlineIcon from 'vue-material-design-icons/ViewListOutline.vue'
 import StarIcon from 'vue-material-design-icons/Star.vue'
 import KeyOutlineIcon from 'vue-material-design-icons/KeyOutline.vue'
@@ -125,7 +151,7 @@ const props = defineProps({
   },
   title: {
     type: String,
-    default: 'Alle Einträge',
+    default: '',
   },
   selectedId: {
     type: String,
@@ -136,6 +162,14 @@ const props = defineProps({
 defineEmits(['new', 'select', 'edit', 'delete'])
 
 const listElement = ref(null)
+
+const displayTitle = computed(() =>
+  props.title || t('nc_bitwarden', 'All items'),
+)
+
+function itemName(item) {
+  return item.name || t('nc_bitwarden', '(no name)')
+}
 
 function normalizeId(value) {
   return String(value ?? '').trim().toLowerCase()
@@ -189,16 +223,19 @@ function typeIcon(type) {
 function itemSubtitle(item) {
   switch (Number(item.type)) {
     case 1:
-      return item.login?.username || 'Zugangsdaten'
+      return item.login?.username
+        || t('nc_bitwarden', 'Login credentials')
 
     case 2:
-      return 'Sichere Notiz'
+      return t('nc_bitwarden', 'Secure note')
 
     case 3:
-      return item.card?.brand || 'Karte'
+      return item.card?.brand
+        || t('nc_bitwarden', 'Card')
 
     case 4:
-      return item.identity?.email || 'Identität'
+      return item.identity?.email
+        || t('nc_bitwarden', 'Identity')
 
     default:
       return ''

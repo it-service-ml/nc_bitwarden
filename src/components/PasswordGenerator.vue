@@ -6,7 +6,10 @@
         class="bw-password-generator__button"
         @click="expanded = !expanded"
       >
-        {{ expanded ? 'Generator schließen' : 'Passwort erzeugen' }}
+        {{ expanded
+          ? t('nc_bitwarden', 'Close generator')
+          : t('nc_bitwarden', 'Generate password')
+        }}
       </button>
 
       <button
@@ -15,7 +18,7 @@
         :disabled="!modelValue"
         @click="copyPassword"
       >
-        Kopieren
+        {{ t('nc_bitwarden', 'Copy') }}
       </button>
     </div>
 
@@ -25,7 +28,7 @@
     >
       <div class="bw-password-generator__length-section">
         <label class="bw-password-generator__length">
-          <span>Länge</span>
+          <span>{{ t('nc_bitwarden', 'Length') }}</span>
 
           <input
             v-model.number="length"
@@ -59,7 +62,7 @@
             v-model="useLowercase"
             type="checkbox"
           >
-          Kleinbuchstaben
+          {{ t('nc_bitwarden', 'Lowercase letters') }}
         </label>
 
         <label>
@@ -67,7 +70,7 @@
             v-model="useUppercase"
             type="checkbox"
           >
-          Großbuchstaben
+          {{ t('nc_bitwarden', 'Uppercase letters') }}
         </label>
 
         <label>
@@ -75,7 +78,7 @@
             v-model="useDigits"
             type="checkbox"
           >
-          Zahlen
+          {{ t('nc_bitwarden', 'Numbers') }}
         </label>
 
         <label>
@@ -83,7 +86,7 @@
             v-model="useSymbols"
             type="checkbox"
           >
-          Sonderzeichen
+          {{ t('nc_bitwarden', 'Special characters') }}
         </label>
 
         <label>
@@ -91,7 +94,10 @@
             v-model="excludeAmbiguous"
             type="checkbox"
           >
-          Mehrdeutige Zeichen ausschließen
+          {{ t(
+            'nc_bitwarden',
+            'Exclude ambiguous characters',
+          ) }}
         </label>
       </div>
 
@@ -100,7 +106,7 @@
         class="bw-password-generator__generate"
         @click="generatePassword"
       >
-        Neues Passwort erzeugen
+        {{ t('nc_bitwarden', 'Generate new password') }}
       </button>
 
       <p
@@ -115,6 +121,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { t } from '@nextcloud/l10n'
 
 const props = defineProps({
   modelValue: {
@@ -159,7 +166,9 @@ function cleanCharacterSet(value) {
 
 function secureIndex(maximum) {
   if (!Number.isInteger(maximum) || maximum < 1) {
-    throw new Error('Ungültige Zeichenauswahl.')
+    throw new Error(
+      t('nc_bitwarden', 'Invalid character selection.'),
+    )
   }
 
   const range = 0x100000000
@@ -212,7 +221,10 @@ function generatePassword() {
   }
 
   if (characterSets.length === 0) {
-    message.value = 'Wähle mindestens eine Zeichengruppe aus.'
+    message.value = t(
+      'nc_bitwarden',
+      'Select at least one character group.',
+    )
     return
   }
 
@@ -243,7 +255,11 @@ function generatePassword() {
   const password = secureShuffle(passwordCharacters).join('')
 
   emit('update:modelValue', password)
-  message.value = `Passwort mit ${password.length} Zeichen erzeugt.`
+  message.value = t(
+    'nc_bitwarden',
+    'Password with {length} characters generated.',
+    { length: password.length },
+  )
 }
 
 async function copyPassword() {
@@ -255,7 +271,7 @@ async function copyPassword() {
 
   try {
     await navigator.clipboard.writeText(props.modelValue)
-    message.value = 'Passwort wurde kopiert.'
+    message.value = t('nc_bitwarden', 'Password was copied.')
 
   } catch {
     const textarea = document.createElement('textarea')
@@ -272,8 +288,11 @@ async function copyPassword() {
     textarea.remove()
 
     message.value = copied
-      ? 'Passwort wurde kopiert.'
-      : 'Passwort konnte nicht kopiert werden.'
+      ? t('nc_bitwarden', 'Password was copied.')
+      : t(
+        'nc_bitwarden',
+        'Password could not be copied.',
+      )
   }
 }
 </script>

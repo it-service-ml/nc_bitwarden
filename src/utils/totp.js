@@ -1,3 +1,5 @@
+import { t } from '@nextcloud/l10n'
+
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 
 function normalizeAlgorithm(value) {
@@ -14,7 +16,11 @@ function normalizeAlgorithm(value) {
       return 'SHA-512'
     default:
       throw new Error(
-        `Nicht unterstützter TOTP-Algorithmus: ${value}`,
+        t(
+          'nc_bitwarden',
+          'Unsupported TOTP algorithm: {algorithm}',
+          { algorithm: value },
+        ),
       )
   }
 }
@@ -35,7 +41,9 @@ function decodeBase32(value) {
     .replace(/[\s=-]/g, '')
 
   if (!normalized) {
-    throw new Error('Das TOTP-Secret ist leer.')
+    throw new Error(
+      t('nc_bitwarden', 'The TOTP secret is empty.'),
+    )
   }
 
   const output = []
@@ -47,7 +55,11 @@ function decodeBase32(value) {
 
     if (index < 0) {
       throw new Error(
-        `Ungültiges Zeichen im TOTP-Secret: ${character}`,
+        t(
+          'nc_bitwarden',
+          'Invalid character in TOTP secret: {character}',
+          { character },
+        ),
       )
     }
 
@@ -67,7 +79,9 @@ function decodeBase32(value) {
   }
 
   if (output.length === 0) {
-    throw new Error('Das TOTP-Secret ist ungültig.')
+    throw new Error(
+      t('nc_bitwarden', 'The TOTP secret is invalid.'),
+    )
   }
 
   return new Uint8Array(output)
@@ -77,7 +91,9 @@ export function parseTotpValue(value) {
   const source = String(value ?? '').trim()
 
   if (!source) {
-    throw new Error('Kein TOTP-Secret vorhanden.')
+    throw new Error(
+      t('nc_bitwarden', 'No TOTP secret is available.'),
+    )
   }
 
   if (!/^otpauth:\/\//i.test(source)) {
@@ -94,7 +110,9 @@ export function parseTotpValue(value) {
   try {
     url = new URL(source)
   } catch {
-    throw new Error('Die TOTP-URL ist ungültig.')
+    throw new Error(
+      t('nc_bitwarden', 'The TOTP URL is invalid.'),
+    )
   }
 
   if (
@@ -102,7 +120,10 @@ export function parseTotpValue(value) {
     || url.hostname.toLowerCase() !== 'totp'
   ) {
     throw new Error(
-      'Nur standardmäßige otpauth://totp/-Einträge werden unterstützt.',
+      t(
+        'nc_bitwarden',
+        'Only standard otpauth://totp/ entries are supported.',
+      ),
     )
   }
 
@@ -110,7 +131,10 @@ export function parseTotpValue(value) {
 
   if (!secret) {
     throw new Error(
-      'Die TOTP-URL enthält kein Secret.',
+      t(
+        'nc_bitwarden',
+        'The TOTP URL does not contain a secret.',
+      ),
     )
   }
 

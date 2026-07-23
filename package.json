@@ -1,6 +1,6 @@
 {
   "name": "nc_bitwarden",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "dev": "vite build --watch",
@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@nextcloud/axios": "^2.5.0",
+    "@nextcloud/l10n": "^3.4.1",
     "@nextcloud/router": "^3.0.0",
     "@nextcloud/vue": "^9.0.0",
     "@noble/hashes": "^1.7.1",

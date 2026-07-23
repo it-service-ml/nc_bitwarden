@@ -1,0 +1,11 @@
+# Kompilierte Frontend-Dateien
+js/
+css/
+
+# Abhängigkeiten
+node_modules/
+vendor/
+vendor-bin/
+
+# Nicht ausgelieferte Dokumentation
+docs/

@@ -1,13 +1,13 @@
 <template>
   <NcDialog
-    name="Passwort generieren"
+    :name="t('nc_bitwarden', 'Generate password')"
     size="normal"
     @closing="$emit('close')"
   >
     <div class="bw-password-dialog">
       <NcPasswordField
         v-model="password"
-        label="Generiertes Passwort"
+        :label="t('nc_bitwarden', 'Generated password')"
       />
 
       <PasswordGenerator
@@ -18,7 +18,7 @@
 
     <template #actions>
       <NcButton @click="$emit('close')">
-        Schließen
+        {{ t('nc_bitwarden', 'Close') }}
       </NcButton>
     </template>
   </NcDialog>
@@ -26,6 +26,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcDialog from '@nextcloud/vue/components/NcDialog'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcPasswordField from '@nextcloud/vue/components/NcPasswordField'

@@ -1,13 +1,13 @@
 <template>
   <div class="bw-login">
     <div class="bw-login__card">
-      <img src="../../img/app.svg" class="bw-login__logo" alt="Bitwarden">
-      <h2>Bitwarden entsperren</h2>
+      <img src="../../img/app.svg" class="bw-login__logo" :alt="t('nc_bitwarden', 'Vaultwarden')">
+      <h2>{{ t('nc_bitwarden', 'Unlock Vaultwarden') }}</h2>
       <NcNoteCard v-if="error" type="error">{{ error }}</NcNoteCard>
       <div class="bw-login__field">
         <NcTextField
           v-model="email"
-          label="E-Mail"
+          :label="t('nc_bitwarden', 'Email')"
           type="email"
           :disabled="loading"
         />
@@ -15,7 +15,7 @@
       <div class="bw-login__field">
         <NcPasswordField
           v-model="masterPassword"
-          label="Master-Passwort"
+          :label="t('nc_bitwarden', 'Master password')"
           :disabled="loading"
           @keyup.enter="doLogin"
         />
@@ -23,7 +23,7 @@
       <div class="bw-login__field">
         <NcTextField
           v-model="twoFactorToken"
-          label="Authenticator-Code (falls aktiviert)"
+          :label="t('nc_bitwarden', 'Authenticator code (if enabled)')"
           inputmode="numeric"
           autocomplete="one-time-code"
           :disabled="loading"
@@ -36,7 +36,7 @@
           type="checkbox"
           :disabled="loading"
         >
-        <span>Für diesen Browser-Tab entsperrt lassen</span>
+        <span>{{ t('nc_bitwarden', 'Keep unlocked in this browser tab') }}</span>
       </label>
       <NcButton
         type="primary"
@@ -45,13 +45,15 @@
         @click="doLogin"
       >
         <template #icon><NcLoadingIcon v-if="loading" :size="20" /></template>
-        {{ loading ? 'Einloggen...' : 'Entsperren' }}
+        {{ loading ? t('nc_bitwarden', 'Signing in…') : t('nc_bitwarden', 'Unlock') }}
       </NcButton>
       <p class="bw-login__hint">
         <LockOutlineIcon :size="16" />
         <span>
-          Dein Master-Passwort verlässt niemals diesen Browser.
-          Nur der abgeleitete Hash wird zur Authentifizierung verwendet.
+          {{ t(
+            'nc_bitwarden',
+            'Your master password never leaves this browser. Only the derived hash is used for authentication.',
+          ) }}
         </span>
       </p>
     </div>
@@ -60,12 +62,13 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcPasswordField from '@nextcloud/vue/components/NcPasswordField'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import { BitwardenApi } from '../services/api.js'
+import { VaultwardenApi } from '../services/api.js'
 import {
   deriveMasterKeyPBKDF2, deriveMasterKeyArgon2id,
   makeMasterPasswordHash, decryptUserSymmetricKey,
@@ -89,7 +92,7 @@ const error = ref('')
 
 onMounted(async () => {
   try {
-    const profile = await BitwardenApi.getCurrentUserProfile()
+    const profile = await VaultwardenApi.getCurrentUserProfile()
     const profileEmail = profile?.email?.trim()
 
     if (!email.value && profileEmail) {
@@ -104,7 +107,7 @@ async function doLogin() {
   error.value = ''
   loading.value = true
   try {
-    const kdfParams = await BitwardenApi.prelogin(email.value)
+    const kdfParams = await VaultwardenApi.prelogin(email.value)
 
     // Bitwarden API gibt PascalCase zurück (Kdf, KdfIterations, KdfMemory, KdfParallelism)
     // Normalisierung: beide Varianten abfangen
@@ -132,7 +135,7 @@ async function doLogin() {
     // Login-Response normalisieren (Vaultwarden: camelCase, Bitwarden Cloud: PascalCase)
     const submittedTwoFactorToken = twoFactorToken.value.trim()
 
-    const loginData = toPascal(await BitwardenApi.login(
+    const loginData = toPascal(await VaultwardenApi.login(
       email.value,
       passwordHash,
       submittedTwoFactorToken || null,
@@ -142,21 +145,21 @@ async function doLogin() {
       const providers = loginData.TwoFactorProviders ?? []
 
       if (!providers.map(Number).includes(0)) {
-        throw new Error('Zwei-Faktor-Anmeldung erforderlich, aber TOTP/Authenticator wird nicht angeboten.')
+        throw new Error(t('nc_bitwarden', 'Two-factor authentication is required, but TOTP is not available.'))
       }
 
       twoFactorRequired.value = true
       twoFactorToken.value = ''
       error.value = submittedTwoFactorToken
-        ? 'Der Authenticator-Code ist ungültig oder bereits abgelaufen.'
-        : 'Bitte den Code deiner Authenticator-App eingeben.'
+        ? t('nc_bitwarden', 'The authenticator code is invalid or has expired.')
+        : t('nc_bitwarden', 'Enter the code from your authenticator app.')
       return
     }
 
     // Nach Normalisierung immer PascalCase: 'Key'
     const encUserKey = loginData.Key
     if (!encUserKey) {
-      throw new Error('Kein User-Key in der Antwort – prüfe E-Mail und Passwort.')
+      throw new Error(t('nc_bitwarden', 'No user key was returned. Check your email address and password.'))
     }
 
     const userKey = await decryptUserSymmetricKey(encUserKey, masterKeyBuffer)
@@ -172,7 +175,7 @@ async function doLogin() {
   } catch (e) {
     // Axios-Fehler: e.response.data.error  |  direkter Fehler: e.message
     const serverMsg = e.response?.data?.error ?? e.response?.data?.message
-    error.value = serverMsg ?? e.message ?? 'Login fehlgeschlagen'
+    error.value = serverMsg ?? e.message ?? t('nc_bitwarden', 'Sign-in failed')
     console.error('[nc_bitwarden] Login-Fehler:', e)
   } finally {
     loading.value = false

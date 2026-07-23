@@ -3,7 +3,7 @@ import { generateUrl } from '@nextcloud/router'
 
 const base = (path) => generateUrl(`/apps/nc_bitwarden${path}`)
 
-export const BitwardenApi = {
+export const VaultwardenApi = {
   async getSettings() { return (await axios.get(base('/settings'))).data },
   async saveSettings(data) { return (await axios.post(base('/settings'), data)).data },
 

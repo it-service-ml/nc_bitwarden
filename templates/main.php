@@ -1,4 +1,5 @@
 <?php
+\OCP\Util::addTranslations('nc_bitwarden');
 /** @var \OCP\IL10N $l */
 /** @var array $_ */
 ?>

@@ -2,15 +2,15 @@
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
     <id>nc_bitwarden</id>
-    <name>Bitwarden</name>
-    <summary>Native Bitwarden Vault Integration</summary>
+    <name>Vaultwarden</name>
+    <summary>Native Vaultwarden integration for Nextcloud</summary>
     <description><![CDATA[
-        Greife direkt aus Nextcloud auf deinen Bitwarden-Tresor zu.
-        Unterstuetzt bitwarden.com, bitwarden.eu und selbst gehostete Instanzen (Vaultwarden).
-        Alle Entschluesselungen finden client-seitig im Browser statt.
-        Das Master-Passwort verlaesst niemals den Browser.
+        Access your Vaultwarden or Bitwarden vault directly from Nextcloud.
+        Supports bitwarden.com, bitwarden.eu, and self-hosted Vaultwarden instances.
+        All decryption takes place client-side in the browser.
+        The master password never leaves the browser.
     ]]></description>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <licence>agpl</licence>
     <author>Philipp Tannich</author>
     <namespace>NcBitwarden</namespace>
@@ -22,7 +22,7 @@
     </dependencies>
     <navigations>
         <navigation>
-            <name>Bitwarden</name>
+            <name>Vaultwarden</name>
             <route>nc_bitwarden.page.index</route>
             <icon>app.svg</icon>
             <order>10</order>

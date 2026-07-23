@@ -1,6 +1,5 @@
 # Frontend-Abhängigkeiten
 /node_modules/
-/package-lock.json
 
 # Erzeugte Frontend-Dateien
 /css/

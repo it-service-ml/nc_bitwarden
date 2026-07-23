@@ -1,13 +1,15 @@
 <template>
   <NcDialog
-    :name="isEdit ? 'Eintrag bearbeiten' : 'Neuer Eintrag'"
+    :name="isEdit
+      ? t('nc_bitwarden', 'Edit item')
+      : t('nc_bitwarden', 'New item')"
     size="normal"
     @close="$emit('close')"
   >
     <div class="bw-form">
       <div class="bw-form__field">
         <label class="bw-form__label">
-          Typ
+          {{ t('nc_bitwarden', 'Type') }}
         </label>
 
         <div class="bw-form__radio-group">
@@ -33,7 +35,7 @@
 
       <NcTextField
         v-model="form.name"
-        label="Name *"
+        :label="t('nc_bitwarden', 'Name *')"
         class="bw-form__field"
       />
 
@@ -42,7 +44,7 @@
           class="bw-form__label"
           for="bw-item-organization"
         >
-          Tresor / Organisation
+          {{ t('nc_bitwarden', 'Vault / organization') }}
         </label>
 
         <select
@@ -52,7 +54,7 @@
           :disabled="isEdit"
         >
           <option value="">
-            Persönlicher Tresor
+            {{ t('nc_bitwarden', 'Personal vault') }}
           </option>
 
           <option
@@ -68,8 +70,10 @@
           v-if="isEdit"
           class="bw-form__hint"
         >
-          Der Besitzer eines bestehenden Eintrags kann hier nicht
-          geändert werden.
+          {{ t(
+            'nc_bitwarden',
+            'The owner of an existing item cannot be changed here.',
+          ) }}
         </small>
       </div>
 
@@ -81,7 +85,7 @@
           class="bw-form__label"
           for="bw-item-collection-search"
         >
-          Sammlungen
+          {{ t('nc_bitwarden', 'Collections') }}
         </label>
 
         <div class="bw-form__collection-search">
@@ -91,15 +95,15 @@
             id="bw-item-collection-search"
             v-model="collectionSearch"
             type="search"
-            placeholder="Sammlungen durchsuchen …"
+            :placeholder="t('nc_bitwarden', 'Search collections…')"
             autocomplete="off"
           >
 
           <button
             v-if="collectionSearch"
             type="button"
-            title="Sammlungssuche leeren"
-            aria-label="Sammlungssuche leeren"
+            :title="t('nc_bitwarden', 'Clear collection search')"
+            :aria-label="t('nc_bitwarden', 'Clear collection search')"
             @click="collectionSearch = ''"
           >
             <CloseIcon :size="17" />
@@ -107,9 +111,15 @@
         </div>
 
         <div class="bw-form__collection-summary">
-          {{ selectedCollections.length }} ausgewählt
-          · {{ collectionResults.length }} Treffer
-          · {{ availableCollections.length }} insgesamt
+          {{ t(
+            'nc_bitwarden',
+            'Selected: {selected} · Results: {results} · Total: {total}',
+            {
+              selected: selectedCollections.length,
+              results: collectionResults.length,
+              total: availableCollections.length,
+            },
+          ) }}
         </div>
 
         <div class="bw-form__collections">
@@ -117,7 +127,7 @@
             v-if="selectedCollections.length > 0"
             class="bw-form__collection-group"
           >
-            <h4>Ausgewählt</h4>
+            <h4>{{ t('nc_bitwarden', 'Selected') }}</h4>
 
             <label
               v-for="collection in selectedCollections"
@@ -145,7 +155,10 @@
 
           <section class="bw-form__collection-group">
             <h4>
-              {{ collectionSearch ? 'Treffer' : 'Verfügbar' }}
+              {{ collectionSearch
+                ? t('nc_bitwarden', 'Results')
+                : t('nc_bitwarden', 'Available')
+              }}
             </h4>
 
             <label
@@ -174,15 +187,19 @@
               v-if="collectionResults.length === 0"
               class="bw-form__collection-empty"
             >
-              Keine passende beschreibbare Sammlung gefunden.
+              {{ t(
+                'nc_bitwarden',
+                'No matching writable collection was found.',
+              ) }}
             </p>
           </section>
         </div>
 
         <small class="bw-form__hint">
-          Gesucht wird im vollständigen Pfad. Ein
-          Organisationseintrag muss mindestens einer Sammlung
-          zugewiesen sein.
+          {{ t(
+            'nc_bitwarden',
+            'The full path is searched. An organization item must be assigned to at least one collection.',
+          ) }}
         </small>
       </div>
 
@@ -191,7 +208,7 @@
           class="bw-form__label"
           for="bw-item-folder"
         >
-          Persönlicher Ordner
+          {{ t('nc_bitwarden', 'Personal folder') }}
         </label>
 
         <select
@@ -200,7 +217,10 @@
           class="bw-form__select"
         >
           <option value="">
-            Kein persönlicher Ordner
+            {{ t(
+              'nc_bitwarden',
+              'No personal folder selected',
+            ) }}
           </option>
 
           <option
@@ -216,13 +236,13 @@
       <template v-if="selectedType === 1">
         <NcTextField
           v-model="form.username"
-          label="Benutzername"
+          :label="t('nc_bitwarden', 'Username')"
           class="bw-form__field"
         />
 
         <NcPasswordField
           v-model="form.password"
-          label="Passwort"
+          :label="t('nc_bitwarden', 'Password')"
           class="bw-form__field"
         />
 
@@ -230,13 +250,13 @@
 
         <NcTextField
           v-model="form.uri"
-          label="URL"
+          :label="t('nc_bitwarden', 'URL')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.totp"
-          label="TOTP (optional)"
+          :label="t('nc_bitwarden', 'TOTP (optional)')"
           class="bw-form__field"
         />
       </template>
@@ -244,7 +264,7 @@
       <template v-if="selectedType === 2">
         <div class="bw-form__field">
           <label class="bw-form__label">
-            Notiz
+            {{ t('nc_bitwarden', 'Note') }}
           </label>
 
           <textarea
@@ -258,31 +278,31 @@
       <template v-if="selectedType === 3">
         <NcTextField
           v-model="form.cardholderName"
-          label="Karteninhaber"
+          :label="t('nc_bitwarden', 'Cardholder')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.cardNumber"
-          label="Kartennummer"
+          :label="t('nc_bitwarden', 'Card number')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.expMonth"
-          label="Monat (MM)"
+          :label="t('nc_bitwarden', 'Month (MM)')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.expYear"
-          label="Jahr (YYYY)"
+          :label="t('nc_bitwarden', 'Year (YYYY)')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.cvv"
-          label="CVV"
+          :label="t('nc_bitwarden', 'CVV')"
           class="bw-form__field"
         />
       </template>
@@ -290,37 +310,37 @@
       <template v-if="selectedType === 4">
         <NcTextField
           v-model="form.firstName"
-          label="Vorname"
+          :label="t('nc_bitwarden', 'First name')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.lastName"
-          label="Nachname"
+          :label="t('nc_bitwarden', 'Last name')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.idEmail"
-          label="E-Mail"
+          :label="t('nc_bitwarden', 'Email')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.phone"
-          label="Telefon"
+          :label="t('nc_bitwarden', 'Phone')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.address"
-          label="Adresse"
+          :label="t('nc_bitwarden', 'Address')"
           class="bw-form__field"
         />
 
         <NcTextField
           v-model="form.company"
-          label="Firma"
+          :label="t('nc_bitwarden', 'Company')"
           class="bw-form__field"
         />
       </template>
@@ -329,7 +349,7 @@
         v-model="form.favorite"
         type="checkbox"
       >
-        Als Favorit markieren
+        {{ t('nc_bitwarden', 'Mark as favorite') }}
       </NcCheckboxRadioSwitch>
 
       <p
@@ -342,7 +362,7 @@
 
     <template #actions>
       <NcButton @click="$emit('close')">
-        Abbrechen
+        {{ t('nc_bitwarden', 'Cancel') }}
       </NcButton>
 
       <NcButton
@@ -350,7 +370,10 @@
         :disabled="saving || !canSave"
         @click="save"
       >
-        {{ saving ? 'Speichern …' : 'Speichern' }}
+        {{ saving
+          ? t('nc_bitwarden', 'Saving…')
+          : t('nc_bitwarden', 'Save')
+        }}
       </NcButton>
     </template>
   </NcDialog>
@@ -364,6 +387,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcDialog from '@nextcloud/vue/components/NcDialog'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
@@ -375,7 +399,7 @@ import CreditCardOutlineIcon from 'vue-material-design-icons/CreditCardOutline.v
 import IdentityOutlineIcon from 'vue-material-design-icons/CardAccountDetailsOutline.vue'
 import MagnifyIcon from 'vue-material-design-icons/Magnify.vue'
 import CloseIcon from 'vue-material-design-icons/Close.vue'
-import { BitwardenApi } from '../services/api.js'
+import { VaultwardenApi } from '../services/api.js'
 import {
   decryptCipher,
   encryptString,
@@ -452,7 +476,7 @@ const form = reactive({
   company: props.item?.identity?.company ?? '',
 })
 
-const nameCollator = new Intl.Collator('de', {
+const nameCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
   numeric: true,
 })
@@ -460,22 +484,22 @@ const nameCollator = new Intl.Collator('de', {
 const typeOptions = [
   {
     id: 1,
-    label: 'Login',
+    label: t('nc_bitwarden', 'Login'),
     icon: KeyOutlineIcon,
   },
   {
     id: 2,
-    label: 'Sichere Notiz',
+    label: t('nc_bitwarden', 'Secure note'),
     icon: NoteTextOutlineIcon,
   },
   {
     id: 3,
-    label: 'Karte',
+    label: t('nc_bitwarden', 'Card'),
     icon: CreditCardOutlineIcon,
   },
   {
     id: 4,
-    label: 'Identität',
+    label: t('nc_bitwarden', 'Identity'),
     icon: IdentityOutlineIcon,
   },
 ]
@@ -662,7 +686,10 @@ async function buildPayload() {
 
   if (!encryptionKey) {
     throw new Error(
-      'Der benötigte Verschlüsselungsschlüssel ist nicht verfügbar.',
+      t(
+        'nc_bitwarden',
+        'The required encryption key is not available.',
+      ),
     )
   }
 
@@ -795,24 +822,24 @@ async function save() {
     let raw
 
     if (isEdit.value) {
-      raw = await BitwardenApi.updateCipher(
+      raw = await VaultwardenApi.updateCipher(
         props.item.id,
         payload,
       )
 
       if (effectiveOrganizationId() && collectionSelectionChanged()) {
-        await BitwardenApi.updateCipherCollections(
+        await VaultwardenApi.updateCipherCollections(
           props.item.id,
           form.collectionIds,
         )
       }
     } else if (form.organizationId) {
-      raw = await BitwardenApi.createOrganizationCipher({
+      raw = await VaultwardenApi.createOrganizationCipher({
         cipher: payload,
         collectionIds: form.collectionIds,
       })
     } else {
-      raw = await BitwardenApi.createCipher(payload)
+      raw = await VaultwardenApi.createCipher(payload)
     }
 
     const decrypted = await decryptCipher(
@@ -824,14 +851,17 @@ async function save() {
     emit('saved', decrypted)
   } catch (exception) {
     console.error(
-      '[nc_bitwarden] Eintrag konnte nicht gespeichert werden:',
+      '[nc_bitwarden] Item could not be saved:',
       exception,
     )
 
     error.value = exception?.response?.data?.error
       || exception?.response?.data?.message
       || exception?.message
-      || 'Der Eintrag konnte nicht gespeichert werden.'
+      || t(
+        'nc_bitwarden',
+        'The item could not be saved.',
+      )
   } finally {
     saving.value = false
   }
