@@ -1,11 +1,26 @@
 # Changelog
 
-## 1.0.0
-- Erste Version der nativen Bitwarden/Vaultwarden-Integration fuer Nextcloud
-- Unterstuetzung fuer bitwarden.com (US & EU) und selbst gehostete Instanzen
-- Client-seitige Vault-Entschluesselung via Web Crypto API (AES-256-CBC + HMAC-SHA256)
-- PBKDF2 und Argon2id Key Derivation (korrekte HKDF-Expand Implementierung)
-- Anzeige und Verwaltung aller Cipher-Typen: Login, Sichere Notiz, Karte, Identitaet
-- Ordner-Navigation und Volltextsuche
-- BruteForceProtection auf Login-Endpunkten
-- SSRF-Schutz: nur HTTPS, keine IP-Adressen, keine internen Hostnamen
+## 1.1.0
+
+### Added
+
+- Organisation collection navigation, search and management
+- Personal folder management
+- Secure browser-side password generator
+- Standalone password generator dialog
+- Live TOTP display with current and next code
+- Automatic TOTP refresh and countdown
+- Dedicated TOTP category
+- Copy support for current and next TOTP codes
+- Improved card-based entry detail view
+- URL opening in a new browser tab
+- Tab-scoped vault unlock
+- Vaultwarden two-factor login support
+
+### Fixed
+
+- Organisation cipher updates retain the organisation ID
+- Vaultwarden API error statuses are forwarded correctly
+- Collection filtering resets consistently after saving
+- Selected entries remain visible after filter changes
+- Bitwarden client version header is sent to Vaultwarden

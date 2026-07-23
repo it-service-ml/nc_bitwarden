@@ -20,245 +20,245 @@
     <div class="bw-vault__navigation">
       <!-- Kategorien -->
       <div class="bw-vault__folders">
-      <div class="bw-vault__section-title">Kategorien</div>
-
-      <button
-        v-for="category in categories"
-        :key="category.id"
-        class="bw-folder"
-        :class="{ 'bw-folder--active':
-          selectedCategory === category.id
-          && selectedFolder === null
-          && selectedCollection === null
-        }"
-        @click="selectCategory(category.id)"
-      >
-        <component
-          :is="category.icon"
-          :size="17"
-          class="bw-folder__icon"
-        />
-        {{ category.label }}
-        <span class="bw-folder__count">{{ categoryCount(category.id) }}</span>
-      </button>
-    </div>
-
-    <!-- Ordner -->
-    <div class="bw-vault__folders">
-      <div class="bw-vault__section-heading">
-        <div class="bw-vault__section-title">Ordner</div>
+        <div class="bw-vault__section-title">Kategorien</div>
 
         <button
-          type="button"
-          class="bw-vault__section-action"
-          title="Neuen persönlichen Ordner erstellen"
-          aria-label="Neuen persönlichen Ordner erstellen"
-          @click="$emit('create-folder')"
-        >
-          <PlusIcon :size="18" />
-        </button>
-      </div>
-
-      <button
-        class="bw-folder"
-        :class="{ 'bw-folder--active': selectedFolder === '__none__' }"
-        @click="selectFolder('__none__')"
-      >
-        <FolderOutlineIcon :size="17" class="bw-folder__icon" />
-        Ohne persönlichen Ordner
-        <span class="bw-folder__count">{{ folderCount(null) }}</span>
-      </button>
-
-      <div
-        v-for="folder in sortedFolders"
-        :key="folder.id"
-        class="bw-folder-row"
-        :class="{
-          'bw-folder-row--active':
-            selectedFolder === normalizeId(folder.id),
-        }"
-      >
-        <button
-          type="button"
-          class="bw-folder bw-folder--main"
-          @click="selectFolder(folder.id)"
-        >
-          <FolderOutlineIcon
-            :size="17"
-            class="bw-folder__icon"
-          />
-
-          <span class="bw-folder__name">
-            {{ folder.name }}
-          </span>
-
-          <span class="bw-folder__count">
-            {{ folderCount(folder.id) }}
-          </span>
-        </button>
-
-        <div class="bw-folder-row__actions">
-          <button
-            type="button"
-            class="bw-folder-row__action"
-            :title="`Ordner ${folder.name} umbenennen`"
-            :aria-label="`Ordner ${folder.name} umbenennen`"
-            @click.stop="$emit('edit-folder', folder)"
-          >
-            <PencilOutlineIcon :size="16" />
-          </button>
-
-          <button
-            type="button"
-            class="bw-folder-row__action"
-            :title="`Ordner ${folder.name} löschen`"
-            :aria-label="`Ordner ${folder.name} löschen`"
-            @click.stop="$emit('delete-folder', folder)"
-          >
-            <DeleteOutlineIcon :size="16" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Organisation-Sammlungen -->
-    <div
-      v-if="collectionRows.length > 0 || canCreateCollection"
-      class="bw-vault__folders"
-    >
-      <div class="bw-vault__section-heading">
-        <div class="bw-vault__section-title">
-          Sammlungen
-        </div>
-
-        <button
-          v-if="canCreateCollection"
-          type="button"
-          class="bw-vault__section-action"
-          title="Neue Sammlung erstellen"
-          aria-label="Neue Sammlung erstellen"
-          @click="$emit('create-collection')"
-        >
-          <PlusIcon :size="18" />
-        </button>
-      </div>
-
-      <div
-        v-if="allCollectionRows.length > 0"
-        class="bw-collection-search"
-      >
-        <MagnifyIcon :size="17" />
-
-        <input
-          v-model="collectionSearch"
-          type="search"
-          placeholder="Sammlungen durchsuchen …"
-          autocomplete="off"
-        >
-
-        <button
-          v-if="collectionSearch"
-          type="button"
-          title="Sammlungssuche leeren"
-          aria-label="Sammlungssuche leeren"
-          @click="collectionSearch = ''"
-        >
-          <CloseIcon :size="16" />
-        </button>
-      </div>
-
-      <div
-        v-if="collectionSearch"
-        class="bw-collection-search__summary"
-      >
-        {{ collectionMatchCount }} Treffer
-      </div>
-
-      <div
-        v-for="collection in collectionRows"
-        :key="collection.id"
-        class="bw-folder-row"
-        :class="{
-          'bw-folder-row--active':
-            selectedCollection === normalizeId(collection.id),
-        }"
-      >
-        <button
-          type="button"
-          class="bw-folder bw-folder--main bw-collection"
-          :style="{
-            paddingLeft: `${0.75 + collection.depth * 1.1}rem`,
+          v-for="category in categories"
+          :key="category.id"
+          class="bw-folder"
+          :class="{ 'bw-folder--active':
+            selectedCategory === category.id
+            && selectedFolder === null
+            && selectedCollection === null
           }"
-          :title="collection.path"
-          @click="selectCollection(collection.id)"
+          @click="selectCategory(category.id)"
         >
-          <span
-            class="bw-collection__toggle"
-            :class="{
-              'bw-collection__toggle--empty':
-                !collection.hasChildren,
-            }"
-            @click.stop="toggleCollection(collection)"
-          >
-            <ChevronRightIcon
-              v-if="
-                collection.hasChildren
-                && isCollectionCollapsed(collection)
-              "
-              :size="17"
-            />
-
-            <ChevronDownIcon
-              v-else-if="collection.hasChildren"
-              :size="17"
-            />
-          </span>
-
-          <ArchiveOutlineIcon
+          <component
+            :is="category.icon"
             :size="17"
             class="bw-folder__icon"
           />
+          {{ category.label }}
+          <span class="bw-folder__count">{{ categoryCount(category.id) }}</span>
+        </button>
+      </div>
 
-          <span
-            class="bw-collection__name"
-            :title="collection.path"
+      <!-- Ordner -->
+      <div class="bw-vault__folders">
+        <div class="bw-vault__section-heading">
+          <div class="bw-vault__section-title">Ordner</div>
+
+          <button
+            type="button"
+            class="bw-vault__section-action"
+            title="Neuen persönlichen Ordner erstellen"
+            aria-label="Neuen persönlichen Ordner erstellen"
+            @click="$emit('create-folder')"
           >
-            {{ collection.label }}
-          </span>
+            <PlusIcon :size="18" />
+          </button>
+        </div>
 
-          <span class="bw-folder__count">
-            {{ collectionCount(collection.id) }}
-          </span>
+        <button
+          class="bw-folder"
+          :class="{ 'bw-folder--active': selectedFolder === '__none__' }"
+          @click="selectFolder('__none__')"
+        >
+          <FolderOutlineIcon :size="17" class="bw-folder__icon" />
+          Ohne persönlichen Ordner
+          <span class="bw-folder__count">{{ folderCount(null) }}</span>
         </button>
 
         <div
-          v-if="collection.canManage || collection.canDelete"
-          class="bw-folder-row__actions"
+          v-for="folder in sortedFolders"
+          :key="folder.id"
+          class="bw-folder-row"
+          :class="{
+            'bw-folder-row--active':
+              selectedFolder === normalizeId(folder.id),
+          }"
         >
           <button
-            v-if="collection.canManage"
             type="button"
-            class="bw-folder-row__action"
-            :title="`Sammlung ${collection.path} umbenennen`"
-            :aria-label="`Sammlung ${collection.path} umbenennen`"
-            @click.stop="$emit('edit-collection', collection)"
+            class="bw-folder bw-folder--main"
+            @click="selectFolder(folder.id)"
           >
-            <PencilOutlineIcon :size="16" />
+            <FolderOutlineIcon
+              :size="17"
+              class="bw-folder__icon"
+            />
+
+            <span class="bw-folder__name">
+              {{ folder.name }}
+            </span>
+
+            <span class="bw-folder__count">
+              {{ folderCount(folder.id) }}
+            </span>
           </button>
 
-          <button
-            v-if="collection.canDelete"
-            type="button"
-            class="bw-folder-row__action"
-            :title="`Sammlung ${collection.path} löschen`"
-            :aria-label="`Sammlung ${collection.path} löschen`"
-            @click.stop="$emit('delete-collection', collection)"
-          >
-            <DeleteOutlineIcon :size="16" />
-          </button>
+          <div class="bw-folder-row__actions">
+            <button
+              type="button"
+              class="bw-folder-row__action"
+              :title="`Ordner ${folder.name} umbenennen`"
+              :aria-label="`Ordner ${folder.name} umbenennen`"
+              @click.stop="$emit('edit-folder', folder)"
+            >
+              <PencilOutlineIcon :size="16" />
+            </button>
+
+            <button
+              type="button"
+              class="bw-folder-row__action"
+              :title="`Ordner ${folder.name} löschen`"
+              :aria-label="`Ordner ${folder.name} löschen`"
+              @click.stop="$emit('delete-folder', folder)"
+            >
+              <DeleteOutlineIcon :size="16" />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <!-- Organisation-Sammlungen -->
+      <div
+        v-if="collectionRows.length > 0 || canCreateCollection"
+        class="bw-vault__folders"
+      >
+        <div class="bw-vault__section-heading">
+          <div class="bw-vault__section-title">
+            Sammlungen
+          </div>
+
+          <button
+            v-if="canCreateCollection"
+            type="button"
+            class="bw-vault__section-action"
+            title="Neue Sammlung erstellen"
+            aria-label="Neue Sammlung erstellen"
+            @click="$emit('create-collection')"
+          >
+            <PlusIcon :size="18" />
+          </button>
+        </div>
+
+        <div
+          v-if="allCollectionRows.length > 0"
+          class="bw-collection-search"
+        >
+          <MagnifyIcon :size="17" />
+
+          <input
+            v-model="collectionSearch"
+            type="search"
+            placeholder="Sammlungen durchsuchen …"
+            autocomplete="off"
+          >
+
+          <button
+            v-if="collectionSearch"
+            type="button"
+            title="Sammlungssuche leeren"
+            aria-label="Sammlungssuche leeren"
+            @click="collectionSearch = ''"
+          >
+            <CloseIcon :size="16" />
+          </button>
+        </div>
+
+        <div
+          v-if="collectionSearch"
+          class="bw-collection-search__summary"
+        >
+          {{ collectionMatchCount }} Treffer
+        </div>
+
+        <div
+          v-for="collection in collectionRows"
+          :key="collection.id"
+          class="bw-folder-row"
+          :class="{
+            'bw-folder-row--active':
+              selectedCollection === normalizeId(collection.id),
+          }"
+        >
+          <button
+            type="button"
+            class="bw-folder bw-folder--main bw-collection"
+            :style="{
+              paddingLeft: `${0.75 + collection.depth * 1.1}rem`,
+            }"
+            :title="collection.path"
+            @click="selectCollection(collection.id)"
+          >
+            <span
+              class="bw-collection__toggle"
+              :class="{
+                'bw-collection__toggle--empty':
+                  !collection.hasChildren,
+              }"
+              @click.stop="toggleCollection(collection)"
+            >
+              <ChevronRightIcon
+                v-if="
+                  collection.hasChildren
+                    && isCollectionCollapsed(collection)
+                "
+                :size="17"
+              />
+
+              <ChevronDownIcon
+                v-else-if="collection.hasChildren"
+                :size="17"
+              />
+            </span>
+
+            <ArchiveOutlineIcon
+              :size="17"
+              class="bw-folder__icon"
+            />
+
+            <span
+              class="bw-collection__name"
+              :title="collection.path"
+            >
+              {{ collection.label }}
+            </span>
+
+            <span class="bw-folder__count">
+              {{ collectionCount(collection.id) }}
+            </span>
+          </button>
+
+          <div
+            v-if="collection.canManage || collection.canDelete"
+            class="bw-folder-row__actions"
+          >
+            <button
+              v-if="collection.canManage"
+              type="button"
+              class="bw-folder-row__action"
+              :title="`Sammlung ${collection.path} umbenennen`"
+              :aria-label="`Sammlung ${collection.path} umbenennen`"
+              @click.stop="$emit('edit-collection', collection)"
+            >
+              <PencilOutlineIcon :size="16" />
+            </button>
+
+            <button
+              v-if="collection.canDelete"
+              type="button"
+              class="bw-folder-row__action"
+              :title="`Sammlung ${collection.path} löschen`"
+              :aria-label="`Sammlung ${collection.path} löschen`"
+              @click.stop="$emit('delete-collection', collection)"
+            >
+              <DeleteOutlineIcon :size="16" />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Footer -->
@@ -282,7 +282,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import NcButton    from '@nextcloud/vue/components/NcButton'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import ViewListOutlineIcon from 'vue-material-design-icons/ViewListOutline.vue'
 import StarOutlineIcon from 'vue-material-design-icons/StarOutline.vue'
@@ -298,8 +298,8 @@ import PencilOutlineIcon from 'vue-material-design-icons/PencilOutline.vue'
 import DeleteOutlineIcon from 'vue-material-design-icons/DeleteOutline.vue'
 import MagnifyIcon from 'vue-material-design-icons/Magnify.vue'
 import CloseIcon from 'vue-material-design-icons/Close.vue'
-import PlusIcon    from 'vue-material-design-icons/Plus.vue'
-import LogoutIcon  from 'vue-material-design-icons/Logout.vue'
+import PlusIcon from 'vue-material-design-icons/Plus.vue'
+import LogoutIcon from 'vue-material-design-icons/Logout.vue'
 import {
   collectionMatchesQuery,
   normalizeCollectionSearch,
@@ -325,14 +325,14 @@ const emit = defineEmits([
   'delete-collection',
 ])
 
-const search                   = ref('')
-const selectedFolder           = ref(null)
-const selectedCollection       = ref(null)
-const selectedCategory         = ref('all')
-const sortMode                 = ref('name-asc')
+const search = ref('')
+const selectedFolder = ref(null)
+const selectedCollection = ref(null)
+const selectedCategory = ref('all')
+const sortMode = ref('name-asc')
 const collapsedCollectionPaths = ref(new Set())
 const collectionSearch = ref('')
-const t                = (s) => s
+const t = (s) => s
 
 const categories = [
   {
@@ -395,13 +395,13 @@ function normalizePath(value) {
 
 const canCreateCollection = computed(() =>
   (props.organizations ?? []).some(
-    organization => organization.canCreateCollections
-  )
+    organization => organization.canCreateCollections,
+  ),
 )
 
 const sortedFolders = computed(() => {
   return [...(props.folders ?? [])].sort((a, b) =>
-    nameCollator.compare(a.name ?? '', b.name ?? '')
+    nameCollator.compare(a.name ?? '', b.name ?? ''),
   )
 })
 
@@ -435,13 +435,13 @@ const allCollectionRows = computed(() => {
       normalizeId(candidate.organizationId)
         === normalizeId(row.organizationId)
       && candidate.path !== row.path
-      && candidate.path.startsWith(`${row.path}/`)
+      && candidate.path.startsWith(`${row.path}/`),
     ),
   }))
 })
 
 const normalizedCollectionQuery = computed(() =>
-  normalizeCollectionSearch(collectionSearch.value)
+  normalizeCollectionSearch(collectionSearch.value),
 )
 
 const collectionMatchCount = computed(() => {
@@ -453,7 +453,7 @@ const collectionMatchCount = computed(() => {
     collectionMatchesQuery(
       row,
       normalizedCollectionQuery.value,
-    )
+    ),
   ).length
 })
 
@@ -468,7 +468,7 @@ const collectionRows = computed(() => {
         collectionMatchesQuery(
           row,
           normalizedCollectionQuery.value,
-        )
+        ),
       )
       .forEach(row => {
         visibleKeys.add(row.nodeKey)
@@ -485,13 +485,13 @@ const collectionRows = computed(() => {
           visibleKeys.add(
             `${organizationId}:${parts
               .slice(0, depth)
-              .join('/')}`
+              .join('/')}`,
           )
         }
       })
 
     return rows.filter(row =>
-      visibleKeys.has(row.nodeKey)
+      visibleKeys.has(row.nodeKey),
     )
   }
 
@@ -512,7 +512,7 @@ const collectionRows = computed(() => {
 
       if (
         collapsedCollectionPaths.value.has(
-          ancestorKey
+          ancestorKey,
         )
       ) {
         return false
@@ -584,7 +584,7 @@ function categoryMatches(item, categoryId) {
       return (
         Number(item.type) === 1
         && Boolean(
-          String(item.login?.totp ?? '').trim()
+          String(item.login?.totp ?? '').trim(),
         )
       )
     case 'notes':
@@ -601,7 +601,7 @@ function categoryMatches(item, categoryId) {
 
 function categoryCount(categoryId) {
   return (props.items ?? []).filter(item =>
-    categoryMatches(item, categoryId)
+    categoryMatches(item, categoryId),
   ).length
 }
 
@@ -609,7 +609,7 @@ function folderCount(folderId) {
   const normalizedFolderId = normalizeId(folderId)
 
   return (props.items ?? []).filter(item =>
-    normalizeId(item.folderId) === normalizedFolderId
+    normalizeId(item.folderId) === normalizedFolderId,
   ).length
 }
 
@@ -617,13 +617,13 @@ function itemBelongsToCollection(item, collectionId) {
   const normalizedCollectionId = normalizeId(collectionId)
 
   return (item.collectionIds ?? []).some(itemCollectionId =>
-    normalizeId(itemCollectionId) === normalizedCollectionId
+    normalizeId(itemCollectionId) === normalizedCollectionId,
   )
 }
 
 function collectionCount(collectionId) {
   return (props.items ?? []).filter(item =>
-    itemBelongsToCollection(item, collectionId)
+    itemBelongsToCollection(item, collectionId),
   ).length
 }
 
@@ -641,19 +641,19 @@ const filtered = computed(() => {
 
   if (selectedCollection.value !== null) {
     list = list.filter(item =>
-      itemBelongsToCollection(item, selectedCollection.value)
+      itemBelongsToCollection(item, selectedCollection.value),
     )
   } else if (selectedFolder.value === '__none__') {
     list = list.filter(item =>
-      normalizeId(item.folderId) === null
+      normalizeId(item.folderId) === null,
     )
   } else if (selectedFolder.value !== null) {
     list = list.filter(item =>
-      normalizeId(item.folderId) === selectedFolder.value
+      normalizeId(item.folderId) === selectedFolder.value,
     )
   } else {
     list = list.filter(item =>
-      categoryMatches(item, selectedCategory.value)
+      categoryMatches(item, selectedCategory.value),
     )
   }
 
@@ -661,7 +661,7 @@ const filtered = computed(() => {
 
   if (term) {
     list = list.filter(item =>
-      (item.name ?? '').toLocaleLowerCase('de').includes(term)
+      (item.name ?? '').toLocaleLowerCase('de').includes(term),
     )
   }
 
@@ -680,13 +680,13 @@ const filtered = computed(() => {
     case 'modified-desc':
       return list.sort((a, b) =>
         revisionTimestamp(b) - revisionTimestamp(a)
-        || compareName(a, b)
+        || compareName(a, b),
       )
 
     case 'modified-asc':
       return list.sort((a, b) =>
         revisionTimestamp(a) - revisionTimestamp(b)
-        || compareName(a, b)
+        || compareName(a, b),
       )
 
     case 'name-asc':
@@ -697,7 +697,7 @@ const filtered = computed(() => {
 const activeFilterLabel = computed(() => {
   if (selectedCollection.value !== null) {
     const collection = allCollectionRows.value.find(row =>
-      normalizeId(row.id) === selectedCollection.value
+      normalizeId(row.id) === selectedCollection.value,
     )
 
     return collection?.path || collection?.label || 'Sammlung'
@@ -709,14 +709,14 @@ const activeFilterLabel = computed(() => {
 
   if (selectedFolder.value !== null) {
     const folder = (props.folders ?? []).find(candidate =>
-      normalizeId(candidate.id) === selectedFolder.value
+      normalizeId(candidate.id) === selectedFolder.value,
     )
 
     return folder?.name || 'Persönlicher Ordner'
   }
 
   return categories.find(category =>
-    category.id === selectedCategory.value
+    category.id === selectedCategory.value,
   )?.label || 'Alle Einträge'
 })
 
@@ -731,7 +731,7 @@ watch(
     }
 
     const folderStillExists = (nextFolders ?? []).some(folder =>
-      normalizeId(folder.id) === selectedFolder.value
+      normalizeId(folder.id) === selectedFolder.value,
     )
 
     if (!folderStillExists) {
@@ -753,7 +753,7 @@ watch(
     const collectionStillExists =
       (nextCollections ?? []).some(collection =>
         normalizeId(collection.id)
-          === selectedCollection.value
+          === selectedCollection.value,
       )
 
     if (!collectionStillExists) {

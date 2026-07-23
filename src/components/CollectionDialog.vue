@@ -131,7 +131,7 @@ const error = ref('')
 const availableOrganizations = computed(() => {
   if (props.collection) {
     return props.organizations.filter(org =>
-      normalizeId(org.id) === normalizeId(props.collection.organizationId)
+      normalizeId(org.id) === normalizeId(props.collection.organizationId),
     )
   }
 
@@ -144,21 +144,21 @@ const availableParents = computed(() => {
   return props.collections
     .filter(candidate =>
       normalizeId(candidate.organizationId)
-        === normalizeId(organizationId.value)
+        === normalizeId(organizationId.value),
     )
     .filter(candidate =>
       normalizeId(candidate.id)
-        !== normalizeId(props.collection?.id)
+        !== normalizeId(props.collection?.id),
     )
     .filter(candidate =>
       !currentPath
-      || !String(candidate.name).startsWith(`${currentPath}/`)
+      || !String(candidate.name).startsWith(`${currentPath}/`),
     )
     .sort((a, b) =>
       String(a.name).localeCompare(String(b.name), 'de', {
         sensitivity: 'base',
         numeric: true,
-      })
+      }),
     )
 })
 
@@ -190,8 +190,8 @@ const canSave = computed(() =>
   Boolean(
     organizationId.value
     && completePath.value
-    && props.organizationKeys[organizationId.value]
-  )
+    && props.organizationKeys[organizationId.value],
+  ),
 )
 
 watch(organizationId, () => {
@@ -241,7 +241,7 @@ async function save() {
 
     if (!orgKey) {
       throw new Error(
-        'Der Organisationsschlüssel ist nicht verfügbar.'
+        'Der Organisationsschlüssel ist nicht verfügbar.',
       )
     }
 
@@ -272,14 +272,14 @@ async function save() {
       const descendants = props.collections
         .filter(candidate =>
           normalizeId(candidate.organizationId)
-            === normalizeId(organizationId.value)
+            === normalizeId(organizationId.value),
         )
         .filter(candidate =>
           normalizeId(candidate.id)
-            !== normalizeId(props.collection.id)
+            !== normalizeId(props.collection.id),
         )
         .filter(candidate =>
-          String(candidate.name).startsWith(oldPrefix)
+          String(candidate.name).startsWith(oldPrefix),
         )
         .sort((a, b) =>
           String(a.name).localeCompare(
@@ -289,7 +289,7 @@ async function save() {
               sensitivity: 'base',
               numeric: true,
             },
-          )
+          ),
         )
 
       for (const descendant of descendants) {
@@ -365,7 +365,7 @@ async function save() {
 
     if (!returnedName) {
       throw new Error(
-        'Vaultwarden hat keine vollständige Sammlung zurückgegeben.'
+        'Vaultwarden hat keine vollständige Sammlung zurückgegeben.',
       )
     }
 

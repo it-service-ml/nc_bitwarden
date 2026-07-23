@@ -152,10 +152,10 @@ async function scrollSelectedItemIntoView() {
 
   const selectedRow = Array.from(
     listElement.value.querySelectorAll(
-      '.bw-items-panel__row[data-item-id]'
-    )
+      '.bw-items-panel__row[data-item-id]',
+    ),
   ).find(row =>
-    normalizeId(row.dataset.itemId) === selectedId
+    normalizeId(row.dataset.itemId) === selectedId,
   )
 
   selectedRow?.scrollIntoView({

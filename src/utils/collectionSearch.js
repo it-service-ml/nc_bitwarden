@@ -22,7 +22,7 @@ export function collectionMatchesQuery(collection, query) {
   }
 
   return normalizeCollectionSearch(
-    normalizeCollectionPath(collection?.name)
+    normalizeCollectionPath(collection?.name),
   ).includes(normalizedQuery)
 }
 

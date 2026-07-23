@@ -226,9 +226,7 @@
           class="bw-form__field"
         />
 
-        <PasswordGenerator
-          v-model="form.password"
-        />
+        <PasswordGenerator v-model="form.password" />
 
         <NcTextField
           v-model="form.uri"
@@ -487,8 +485,8 @@ const sortedFolders = computed(() =>
     nameCollator.compare(
       left.name ?? '',
       right.name ?? '',
-    )
-  )
+    ),
+  ),
 )
 
 const organizationOptions = computed(() =>
@@ -501,7 +499,7 @@ const organizationOptions = computed(() =>
         || props.collections.some(collection =>
           normalizeId(collection.organizationId)
             === organizationId
-          && !collection.readOnly
+          && !collection.readOnly,
         )
       )
     })
@@ -509,48 +507,48 @@ const organizationOptions = computed(() =>
       nameCollator.compare(
         left.name ?? '',
         right.name ?? '',
-      )
-    )
+      ),
+    ),
 )
 
 const availableCollections = computed(() =>
   props.collections
     .filter(collection =>
       normalizeId(collection.organizationId)
-        === normalizeId(form.organizationId)
+        === normalizeId(form.organizationId),
     )
     .filter(collection =>
       !collection.readOnly
-      || collectionIsSelected(collection.id)
+      || collectionIsSelected(collection.id),
     )
     .sort((left, right) =>
       nameCollator.compare(
         left.name ?? '',
         right.name ?? '',
-      )
-    )
+      ),
+    ),
 )
 
 const selectedCollections = computed(() =>
   availableCollections.value.filter(collection =>
-    collectionIsSelected(collection.id)
-  )
+    collectionIsSelected(collection.id),
+  ),
 )
 
 const collectionResults = computed(() =>
   availableCollections.value
     .filter(collection =>
-      !collectionIsSelected(collection.id)
+      !collectionIsSelected(collection.id),
     )
     .filter(collection =>
-      !collection.readOnly
+      !collection.readOnly,
     )
     .filter(collection =>
       collectionMatchesQuery(
         collection,
         collectionSearch.value,
-      )
-    )
+      ),
+    ),
 )
 
 const canSave = computed(() => {
@@ -603,7 +601,7 @@ function collectionIsSelected(collectionId) {
   const normalizedCollectionId = normalizeId(collectionId)
 
   return form.collectionIds.some(selectedId =>
-    normalizeId(selectedId) === normalizedCollectionId
+    normalizeId(selectedId) === normalizedCollectionId,
   )
 }
 
@@ -619,7 +617,7 @@ function getOrganizationKey(organizationId) {
   const match = Object.entries(props.organizationKeys)
     .find(([candidateId]) =>
       normalizeId(candidateId)
-        === normalizeId(organizationId)
+        === normalizeId(organizationId),
     )
 
   return match?.[1] ?? null
@@ -664,7 +662,7 @@ async function buildPayload() {
 
   if (!encryptionKey) {
     throw new Error(
-      'Der benötigte Verschlüsselungsschlüssel ist nicht verfügbar.'
+      'Der benötigte Verschlüsselungsschlüssel ist nicht verfügbar.',
     )
   }
 
@@ -694,9 +692,9 @@ async function buildPayload() {
         : null,
       uris: form.uri
         ? [{
-            uri: await encrypt(form.uri, encryptionKey),
-            match: null,
-          }]
+          uri: await encrypt(form.uri, encryptionKey),
+          match: null,
+        }]
         : [],
     }
   } else if (selectedType.value === 2) {
@@ -751,15 +749,15 @@ function normalizedIdList(values) {
   return [...new Set(
     (values ?? [])
       .map(normalizeId)
-      .filter(Boolean)
+      .filter(Boolean),
   )].sort()
 }
 
 function collectionSelectionChanged() {
   return JSON.stringify(
-    normalizedIdList(initialCollectionIds)
+    normalizedIdList(initialCollectionIds),
   ) !== JSON.stringify(
-    normalizedIdList(form.collectionIds)
+    normalizedIdList(form.collectionIds),
   )
 }
 
@@ -776,7 +774,7 @@ function toPascal(value) {
       Object.entries(value).map(([key, itemValue]) => [
         key.charAt(0).toUpperCase() + key.slice(1),
         toPascal(itemValue),
-      ])
+      ]),
     )
   }
 

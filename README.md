@@ -2,7 +2,7 @@
 
 > Native Bitwarden & Vaultwarden Integration for Nextcloud
 
-![Nextcloud](https://img.shields.io/badge/Nextcloud-31--33-0082C9?logo=nextcloud&logoColor=white)
+![Nextcloud](https://img.shields.io/badge/Nextcloud-31--34-0082C9?logo=nextcloud&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green)
 ![Security](https://img.shields.io/badge/E2E_Encrypted-✓-brightgreen)
@@ -16,6 +16,10 @@ Your master password never leaves your device.
 ## ✨ Features
 
 - 🔑 **Login entries** – username, password, TOTP, URLs
+- ⏱️ **Live TOTP codes** – current and next code with automatic refresh
+- 🎲 **Password generator** – configurable secure browser-side generation
+- ⭐ **Favourites view** – quick access to marked entries
+- 🗂️ **Collection management** – organisation collections and search
 - 📝 **Secure notes** – encrypted free-text notes
 - 💳 **Credit cards** – card number, CVV, expiry date
 - 🪪 **Identities** – address, phone, email, company
@@ -69,7 +73,7 @@ Browser                          Nextcloud Server              Bitwarden / Vault
 
 | Component | Version |
 |---|---|
-| Nextcloud | 31, 32 or 33 |
+| Nextcloud | 31, 32, 33 or 34 |
 | PHP | 8.1+ |
 | Node.js | 20+ |
 | npm | 8.3+ |
@@ -82,7 +86,7 @@ Browser                          Nextcloud Server              Bitwarden / Vault
 
 ```bash
 cd /var/www/html/apps   # or your Nextcloud apps directory
-git clone https://github.com/derfips/nc_bitwarden.git
+git clone https://github.com/it-service-ml/nc_bitwarden.git
 ```
 
 ### 2. Build the JavaScript
@@ -229,9 +233,9 @@ compatibility.
 
 ## 🗺️ Roadmap
 
-- [ ] Live TOTP code display (auto-refresh)
-- [ ] Password generator
-- [ ] Favourites view
+- [x] Live TOTP code display (auto-refresh)
+- [x] Password generator
+- [x] Favourites view
 - [ ] Offline cache (Service Worker)
 - [ ] Bitwarden Send support
 
