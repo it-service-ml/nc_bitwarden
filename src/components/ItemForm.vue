@@ -226,6 +226,10 @@
           class="bw-form__field"
         />
 
+        <PasswordGenerator
+          v-model="form.password"
+        />
+
         <NcTextField
           v-model="form.uri"
           label="URL"
@@ -355,6 +359,7 @@
 </template>
 
 <script setup>
+import PasswordGenerator from './PasswordGenerator.vue'
 import {
   computed,
   reactive,
