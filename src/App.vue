@@ -23,6 +23,9 @@
           @logout="logout"
           @filter-change="onFilterChange"
           @navigate="showVaultList"
+          @create-folder="openFolderDialog()"
+          @edit-folder="openFolderDialog($event)"
+          @delete-folder="deleteFolder"
         />
       </aside>
 
@@ -71,6 +74,14 @@
         </div>
       </main>
     </div>
+
+    <FolderDialog
+      v-if="showFolderDialog"
+      :folder="editFolder"
+      :user-key="userKey"
+      @close="closeFolderDialog"
+      @saved="onFolderSaved"
+    />
   </div>
 </template>
 
@@ -83,6 +94,7 @@ import VaultList     from './components/VaultList.vue'
 import VaultItems    from './components/VaultItems.vue'
 import ItemDetail    from './components/ItemDetail.vue'
 import ItemForm      from './components/ItemForm.vue'
+import FolderDialog  from './components/FolderDialog.vue'
 import { BitwardenApi } from './services/api.js'
 import {
   decryptCipher, decryptEncString,
@@ -112,8 +124,10 @@ const visibleItems      = ref([])
 const activeFilterLabel = ref('Alle Einträge')
 const selectedItem      = ref(null)
 const loading      = ref(false)
-const showForm     = ref(false)
-const editItem     = ref(null)
+const showForm         = ref(false)
+const editItem         = ref(null)
+const showFolderDialog = ref(false)
+const editFolder       = ref(null)
 
 async function onLoggedIn({ masterKey, keepUnlocked = true }) {
   userKey.value    = masterKey
@@ -238,6 +252,8 @@ function resetVaultState() {
   selectedItem.value = null
   showForm.value = false
   editItem.value = null
+  showFolderDialog.value = false
+  editFolder.value = null
 }
 
 function logout() {
@@ -279,6 +295,85 @@ function showVaultList() {
   selectedItem.value = null
   showForm.value = false
   editItem.value = null
+}
+
+function normalizeId(value) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  return String(value).trim().toLowerCase()
+}
+
+function openFolderDialog(folder = null) {
+  editFolder.value = folder
+  showFolderDialog.value = true
+}
+
+function closeFolderDialog() {
+  showFolderDialog.value = false
+  editFolder.value = null
+}
+
+function onFolderSaved(folder) {
+  const folderId = normalizeId(folder.id)
+  const index = folders.value.findIndex(candidate =>
+    normalizeId(candidate.id) === folderId
+  )
+
+  if (index >= 0) {
+    folders.value = folders.value.map((candidate, candidateIndex) =>
+      candidateIndex === index ? folder : candidate
+    )
+  } else {
+    folders.value = [...folders.value, folder]
+  }
+
+  closeFolderDialog()
+}
+
+async function deleteFolder(folder) {
+  const count = items.value.filter(item =>
+    normalizeId(item.folderId) === normalizeId(folder.id)
+  ).length
+
+  const message = count > 0
+    ? `Ordner "${folder.name}" wirklich löschen?\n\n${count} Einträge werden danach unter "Ohne persönlichen Ordner" angezeigt.`
+    : `Ordner "${folder.name}" wirklich löschen?`
+
+  if (!confirm(message)) {
+    return
+  }
+
+  try {
+    await BitwardenApi.deleteFolder(folder.id)
+
+    folders.value = folders.value.filter(candidate =>
+      normalizeId(candidate.id) !== normalizeId(folder.id)
+    )
+
+    items.value = items.value.map(item =>
+      normalizeId(item.folderId) === normalizeId(folder.id)
+        ? { ...item, folderId: null }
+        : item
+    )
+
+    if (
+      selectedItem.value
+      && normalizeId(selectedItem.value.folderId) === normalizeId(folder.id)
+    ) {
+      selectedItem.value = {
+        ...selectedItem.value,
+        folderId: null,
+      }
+    }
+  } catch (exception) {
+    console.error('[nc_bitwarden] Ordner konnte nicht gelöscht werden:', exception)
+    alert(
+      exception?.response?.data?.error
+      || 'Der Ordner konnte nicht gelöscht werden.'
+    )
+  }
 }
 
 function onDelete(id)      { items.value = items.value.filter(i => i.id !== id); selectedItem.value = null }

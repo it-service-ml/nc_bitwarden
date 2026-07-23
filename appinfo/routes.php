@@ -13,7 +13,10 @@ return [
         ['name' => 'bitwarden_api#deleteCipher', 'url' => '/api/ciphers/{id}',  'verb' => 'DELETE'],
         ['name' => 'bitwarden_api#getFolders',   'url' => '/api/folders',       'verb' => 'GET'],
         ['name' => 'bitwarden_api#createFolder', 'url' => '/api/folders',       'verb' => 'POST'],
-        ['name' => 'bitwarden_api#deleteFolder', 'url' => '/api/folders/{id}',  'verb' => 'DELETE'],
+        ['name' => 'bitwarden_api#updateFolderPost',   'url' => '/api/folders/{id}',        'verb' => 'POST'],
+        ['name' => 'bitwarden_api#updateFolderPut',    'url' => '/api/folders/{id}',        'verb' => 'PUT'],
+        ['name' => 'bitwarden_api#deleteFolderPost',   'url' => '/api/folders/{id}/delete', 'verb' => 'POST'],
+        ['name' => 'bitwarden_api#deleteFolderDelete', 'url' => '/api/folders/{id}',        'verb' => 'DELETE'],
 
         ['name' => 'settings#getSettings',  'url' => '/settings', 'verb' => 'GET'],
         ['name' => 'settings#saveSettings', 'url' => '/settings', 'verb' => 'POST'],

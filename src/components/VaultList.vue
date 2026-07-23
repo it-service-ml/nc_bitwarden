@@ -45,7 +45,19 @@
 
     <!-- Ordner -->
     <div class="bw-vault__folders">
-      <div class="bw-vault__section-title">Ordner</div>
+      <div class="bw-vault__section-heading">
+        <div class="bw-vault__section-title">Ordner</div>
+
+        <button
+          type="button"
+          class="bw-vault__section-action"
+          title="Neuen persönlichen Ordner erstellen"
+          aria-label="Neuen persönlichen Ordner erstellen"
+          @click="$emit('create-folder')"
+        >
+          <PlusIcon :size="18" />
+        </button>
+      </div>
 
       <button
         class="bw-folder"
@@ -57,16 +69,56 @@
         <span class="bw-folder__count">{{ folderCount(null) }}</span>
       </button>
 
-      <button
+      <div
         v-for="folder in sortedFolders"
         :key="folder.id"
-        class="bw-folder"
-        :class="{ 'bw-folder--active': selectedFolder === normalizeId(folder.id) }"
-        @click="selectFolder(folder.id)"
+        class="bw-folder-row"
+        :class="{
+          'bw-folder-row--active':
+            selectedFolder === normalizeId(folder.id),
+        }"
       >
-        <FolderOutlineIcon :size="17" class="bw-folder__icon" /> {{ folder.name }}
-        <span class="bw-folder__count">{{ folderCount(folder.id) }}</span>
-      </button>
+        <button
+          type="button"
+          class="bw-folder bw-folder--main"
+          @click="selectFolder(folder.id)"
+        >
+          <FolderOutlineIcon
+            :size="17"
+            class="bw-folder__icon"
+          />
+
+          <span class="bw-folder__name">
+            {{ folder.name }}
+          </span>
+
+          <span class="bw-folder__count">
+            {{ folderCount(folder.id) }}
+          </span>
+        </button>
+
+        <div class="bw-folder-row__actions">
+          <button
+            type="button"
+            class="bw-folder-row__action"
+            :title="`Ordner ${folder.name} umbenennen`"
+            :aria-label="`Ordner ${folder.name} umbenennen`"
+            @click.stop="$emit('edit-folder', folder)"
+          >
+            <PencilOutlineIcon :size="16" />
+          </button>
+
+          <button
+            type="button"
+            class="bw-folder-row__action"
+            :title="`Ordner ${folder.name} löschen`"
+            :aria-label="`Ordner ${folder.name} löschen`"
+            @click.stop="$emit('delete-folder', folder)"
+          >
+            <DeleteOutlineIcon :size="16" />
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Organisation-Sammlungen -->
@@ -145,6 +197,8 @@ import FolderOutlineIcon from 'vue-material-design-icons/FolderOutline.vue'
 import ArchiveOutlineIcon from 'vue-material-design-icons/ArchiveOutline.vue'
 import ChevronRightIcon from 'vue-material-design-icons/ChevronRight.vue'
 import ChevronDownIcon from 'vue-material-design-icons/ChevronDown.vue'
+import PencilOutlineIcon from 'vue-material-design-icons/PencilOutline.vue'
+import DeleteOutlineIcon from 'vue-material-design-icons/DeleteOutline.vue'
 import PlusIcon    from 'vue-material-design-icons/Plus.vue'
 import LogoutIcon  from 'vue-material-design-icons/Logout.vue'
 
@@ -154,7 +208,15 @@ const props = defineProps({
   collections: Array,
   selectedId: String,
 })
-const emit  = defineEmits(['new', 'logout', 'filter-change', 'navigate'])
+const emit = defineEmits([
+  'new',
+  'logout',
+  'filter-change',
+  'navigate',
+  'create-folder',
+  'edit-folder',
+  'delete-folder',
+])
 
 const search                   = ref('')
 const selectedFolder           = ref(null)
@@ -462,6 +524,29 @@ const activeFilterLabel = computed(() => {
 })
 
 watch(
+  () => props.folders,
+  nextFolders => {
+    if (
+      selectedFolder.value === null
+      || selectedFolder.value === '__none__'
+    ) {
+      return
+    }
+
+    const folderStillExists = (nextFolders ?? []).some(folder =>
+      normalizeId(folder.id) === selectedFolder.value
+    )
+
+    if (!folderStillExists) {
+      selectCategory('all')
+    }
+  },
+  {
+    deep: true,
+  },
+)
+
+watch(
   [filtered, activeFilterLabel],
   ([filteredItems, label]) => {
     emit('filter-change', {
@@ -523,6 +608,14 @@ watch(
   border-bottom: 1px solid var(--color-border);
 }
 
+.bw-vault__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-right: 0.5rem;
+}
+
 .bw-vault__section-title {
   padding: 0.35rem 0.75rem;
   font-size: 0.75rem;
@@ -530,6 +623,24 @@ watch(
   color: var(--color-text-maxcontrast);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.bw-vault__section-action {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-main-text);
+  cursor: pointer;
+}
+
+.bw-vault__section-action:hover {
+  background: var(--color-background-hover);
 }
 
 .bw-folder__icon {
@@ -590,6 +701,63 @@ watch(
   background:    var(--color-background-dark);
   border-radius: 10px;
   padding:       0 0.4rem;
+}
+
+.bw-folder__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bw-folder-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--border-radius);
+}
+
+.bw-folder-row:hover {
+  background: var(--color-background-hover);
+}
+
+.bw-folder-row--active {
+  background: var(--color-primary-element-light);
+  font-weight: 600;
+}
+
+.bw-folder--main {
+  min-width: 0;
+  flex: 1;
+}
+
+.bw-folder--main:hover {
+  background: transparent;
+}
+
+.bw-folder-row__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.1rem;
+  padding-right: 0.35rem;
+}
+
+.bw-folder-row__action {
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-maxcontrast);
+  cursor: pointer;
+}
+
+.bw-folder-row__action:hover,
+.bw-folder-row__action:focus-visible {
+  background: var(--color-background-dark);
+  color: var(--color-main-text);
 }
 
 /* ── Footer ── */

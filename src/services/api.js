@@ -49,5 +49,6 @@ export const BitwardenApi = {
 
   async getFolders()               { return (await axios.get(base('/api/folders'))).data },
   async createFolder(data)         { return (await axios.post(base('/api/folders'), data)).data },
-  async deleteFolder(id)           { return (await axios.delete(base(`/api/folders/${id}`))).data },
+  async updateFolder(id, data)     { return (await axios.post(base(`/api/folders/${id}`), data)).data },
+  async deleteFolder(id)           { return (await axios.post(base(`/api/folders/${id}/delete`))).data },
 }

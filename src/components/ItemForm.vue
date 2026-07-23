@@ -16,6 +16,33 @@
 
       <NcTextField v-model="form.name" label="Name *" class="bw-form__field" />
 
+      <div class="bw-form__field">
+        <label
+          class="bw-form__label"
+          for="bw-item-folder"
+        >
+          Persönlicher Ordner
+        </label>
+
+        <select
+          id="bw-item-folder"
+          v-model="form.folderId"
+          class="bw-form__select"
+        >
+          <option value="">
+            Kein persönlicher Ordner
+          </option>
+
+          <option
+            v-for="folder in sortedFolders"
+            :key="folder.id"
+            :value="folder.id"
+          >
+            {{ folder.name }}
+          </option>
+        </select>
+      </div>
+
       <template v-if="selectedType === 1">
         <NcTextField      v-model="form.username" label="Benutzername"    class="bw-form__field" />
         <NcPasswordField  v-model="form.password" label="Passwort"        class="bw-form__field" />
@@ -50,6 +77,10 @@
       <NcCheckboxRadioSwitch v-model="form.favorite" type="checkbox">
         Als Favorit markieren
       </NcCheckboxRadioSwitch>
+
+      <p v-if="error" class="bw-form__error">
+        {{ error }}
+      </p>
     </div>
 
     <template #actions>
@@ -75,12 +106,32 @@ import IdentityOutlineIcon from 'vue-material-design-icons/CardAccountDetailsOut
 import { BitwardenApi } from '../services/api.js'
 import { encryptString, decryptCipher } from '../services/crypto.js'
 
-const props = defineProps({ userKey: Object, item: Object })
-const emit  = defineEmits(['save', 'close'])
+const props = defineProps({
+  userKey: Object,
+  item: Object,
+  folders: {
+    type: Array,
+    default: () => [],
+  },
+})
+
+const emit = defineEmits(['saved', 'close'])
 
 const saving       = ref(false)
+const error        = ref('')
 const isEdit       = computed(() => !!props.item?.id)
 const selectedType = ref(props.item?.type ?? 1)
+
+const nameCollator = new Intl.Collator('de', {
+  sensitivity: 'base',
+  numeric: true,
+})
+
+const sortedFolders = computed(() =>
+  [...props.folders].sort((a, b) =>
+    nameCollator.compare(a.name ?? '', b.name ?? '')
+  )
+)
 
 const typeOptions = [
   {
@@ -106,7 +157,9 @@ const typeOptions = [
 ]
 
 const form = reactive({
-  name: props.item?.name ?? '', favorite: props.item?.favorite ?? false,
+  name: props.item?.name ?? '',
+  folderId: props.item?.folderId ?? '',
+  favorite: props.item?.favorite ?? false,
   username: props.item?.login?.username ?? '', password: props.item?.login?.password ?? '',
   uri: props.item?.login?.uris?.[0]?.uri ?? '', totp: props.item?.login?.totp ?? '',
   notes: props.item?.notes ?? '',
@@ -120,25 +173,130 @@ const form = reactive({
 const enc = (v) => encryptString(v, props.userKey.encKey, props.userKey.macKey)
 
 async function buildPayload() {
-  const base = { Type: selectedType.value, Name: await enc(form.name), Notes: form.notes ? await enc(form.notes) : null, Favorite: form.favorite }
-  if (selectedType.value === 1) {
-    base.Login = { Username: await enc(form.username), Password: await enc(form.password), Totp: form.totp ? await enc(form.totp) : null, Uris: form.uri ? [{ Uri: await enc(form.uri), Match: null }] : [] }
-  } else if (selectedType.value === 3) {
-    base.Card = { CardholderName: await enc(form.cardholderName), Number: await enc(form.cardNumber), ExpMonth: await enc(form.expMonth), ExpYear: await enc(form.expYear), Code: await enc(form.cvv) }
-  } else if (selectedType.value === 4) {
-    base.Identity = { FirstName: await enc(form.firstName), LastName: await enc(form.lastName), Email: await enc(form.idEmail), Phone: await enc(form.phone), Address1: await enc(form.address), Company: await enc(form.company) }
+  const base = {
+    type: Number(selectedType.value),
+    name: await enc(form.name),
+    notes: form.notes ? await enc(form.notes) : null,
+    favorite: Boolean(form.favorite),
+    folderId: form.folderId || null,
+    organizationId: props.item?.organizationId ?? null,
+    fields: [],
+    reprompt: 0,
   }
+
+  if (selectedType.value === 1) {
+    base.login = {
+      username: form.username ? await enc(form.username) : null,
+      password: form.password ? await enc(form.password) : null,
+      totp: form.totp ? await enc(form.totp) : null,
+      uris: form.uri
+        ? [{
+            uri: await enc(form.uri),
+            match: null,
+          }]
+        : [],
+    }
+  } else if (selectedType.value === 2) {
+    base.secureNote = {
+      type: 0,
+    }
+  } else if (selectedType.value === 3) {
+    base.card = {
+      cardholderName: form.cardholderName
+        ? await enc(form.cardholderName)
+        : null,
+      number: form.cardNumber
+        ? await enc(form.cardNumber)
+        : null,
+      expMonth: form.expMonth
+        ? await enc(form.expMonth)
+        : null,
+      expYear: form.expYear
+        ? await enc(form.expYear)
+        : null,
+      code: form.cvv
+        ? await enc(form.cvv)
+        : null,
+    }
+  } else if (selectedType.value === 4) {
+    base.identity = {
+      firstName: form.firstName
+        ? await enc(form.firstName)
+        : null,
+      lastName: form.lastName
+        ? await enc(form.lastName)
+        : null,
+      email: form.idEmail
+        ? await enc(form.idEmail)
+        : null,
+      phone: form.phone
+        ? await enc(form.phone)
+        : null,
+      address1: form.address
+        ? await enc(form.address)
+        : null,
+      company: form.company
+        ? await enc(form.company)
+        : null,
+    }
+  }
+
   return base
 }
 
+function toPascal(value) {
+  if (Array.isArray(value)) {
+    return value.map(toPascal)
+  }
+
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, itemValue]) => [
+        key.charAt(0).toUpperCase() + key.slice(1),
+        toPascal(itemValue),
+      ])
+    )
+  }
+
+  return value
+}
+
 async function save() {
+  if (saving.value || !form.name.trim()) {
+    return
+  }
+
   saving.value = true
+  error.value = ''
+
   try {
     const payload = await buildPayload()
-    const raw = isEdit.value ? await BitwardenApi.updateCipher(props.item.id, payload) : await BitwardenApi.createCipher(payload)
-    emit('save', await decryptCipher(raw, props.userKey))
-  } finally { saving.value = false }
+
+    const raw = isEdit.value
+      ? await BitwardenApi.updateCipher(props.item.id, payload)
+      : await BitwardenApi.createCipher(payload)
+
+    const decrypted = await decryptCipher(
+      toPascal(raw),
+      props.userKey,
+    )
+
+    emit('saved', decrypted)
+  } catch (exception) {
+    console.error(
+      '[nc_bitwarden] Eintrag konnte nicht gespeichert werden:',
+      exception,
+    )
+
+    error.value = exception?.response?.data?.error
+      || exception?.response?.data?.message
+      || exception?.message
+      || 'Der Eintrag konnte nicht gespeichert werden.'
+  } finally {
+    saving.value = false
+  }
 }
+
 </script>
 
 <style scoped>
@@ -152,5 +310,20 @@ async function save() {
 }
 
 .bw-form__radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.bw-form__error {
+  margin: 0.75rem 0 0;
+  color: var(--color-error);
+}
+
+.bw-form__select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius);
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+}
+
 .bw-form__textarea    { width: 100%; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--border-radius); background: var(--color-main-background); color: var(--color-main-text); resize: vertical; font-family: inherit; }
 </style>

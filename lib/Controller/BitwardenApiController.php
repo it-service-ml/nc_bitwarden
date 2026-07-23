@@ -88,11 +88,42 @@ class BitwardenApiController extends Controller {
     public function createFolder(): JSONResponse { return $this->proxy('POST', '/folders', $this->getJsonBody()); }
 
     #[NoAdminRequired]
-    public function deleteFolder(string $id): JSONResponse { return $this->proxy('DELETE', "/folders/$id"); }
+    public function updateFolderPost(string $id): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/folders/$id",
+            $this->getJsonBody()
+        );
+    }
+
+    #[NoAdminRequired]
+    public function updateFolderPut(string $id): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/folders/$id",
+            $this->getJsonBody()
+        );
+    }
+
+    #[NoAdminRequired]
+    public function deleteFolderPost(string $id): JSONResponse {
+        return $this->proxy('POST', "/folders/$id/delete");
+    }
+
+    #[NoAdminRequired]
+    public function deleteFolderDelete(string $id): JSONResponse {
+        return $this->proxy('POST', "/folders/$id/delete");
+    }
+
 
     private function getJsonBody(): array {
-        $raw = $this->request->getBody();
-        return $raw ? (json_decode($raw, true) ?? []) : [];
+        $params = $this->request->getParams();
+        $this->request->throwDecodingExceptionIfAny();
+
+        // URL-Parameter dürfen nicht an Vaultwarden weitergereicht werden.
+        unset($params['id']);
+
+        return $params;
     }
 
     private function proxy(string $method, string $path, array $body = []): JSONResponse {
