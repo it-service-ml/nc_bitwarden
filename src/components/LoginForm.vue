@@ -10,10 +10,10 @@
       <div class="bw-login__field">
         <NcPasswordField v-model="masterPassword" label="Master-Passwort" :disabled="loading" @keyup.enter="doLogin" />
       </div>
-      <div v-if="twoFactorRequired" class="bw-login__field">
+      <div class="bw-login__field">
         <NcTextField
           v-model="twoFactorToken"
-          label="Authenticator-Code"
+          label="Authenticator-Code (falls aktiviert)"
           inputmode="numeric"
           autocomplete="one-time-code"
           :disabled="loading"
@@ -111,10 +111,12 @@ async function doLogin() {
 
     const passwordHash = await makeMasterPasswordHash(masterKeyBuffer, masterPassword.value)
     // Login-Response normalisieren (Vaultwarden: camelCase, Bitwarden Cloud: PascalCase)
+    const submittedTwoFactorToken = twoFactorToken.value.trim()
+
     const loginData = toPascal(await BitwardenApi.login(
       email.value,
       passwordHash,
-      twoFactorRequired.value ? twoFactorToken.value : null,
+      submittedTwoFactorToken || null,
     ))
 
     if (loginData.TwoFactorRequired) {
@@ -126,7 +128,9 @@ async function doLogin() {
 
       twoFactorRequired.value = true
       twoFactorToken.value = ''
-      error.value = 'Bitte den sechsstelligen Code deiner Authenticator-App eingeben.'
+      error.value = submittedTwoFactorToken
+        ? 'Der Authenticator-Code ist ungültig oder bereits abgelaufen.'
+        : 'Bitte den Code deiner Authenticator-App eingeben.'
       return
     }
 
