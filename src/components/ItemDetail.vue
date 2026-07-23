@@ -3,18 +3,18 @@
     <header class="bw-detail__header">
       <div class="bw-detail__title">
         <span class="bw-detail__eyebrow">
-          Eintrag
+          {{ t('nc_bitwarden', 'Item') }}
         </span>
 
         <h2>
-          {{ item.name || '(kein Name)' }}
+          {{ itemName }}
         </h2>
       </div>
 
       <div class="bw-detail__actions">
         <NcButton
-          title="Eintrag bearbeiten"
-          aria-label="Eintrag bearbeiten"
+          :title="t('nc_bitwarden', 'Edit item')"
+          :aria-label="t('nc_bitwarden', 'Edit item')"
           @click="$emit('edit', item)"
         >
           <PencilOutlineIcon :size="18" />
@@ -22,8 +22,8 @@
 
         <NcButton
           type="error"
-          title="Eintrag löschen"
-          aria-label="Eintrag löschen"
+          :title="t('nc_bitwarden', 'Delete item')"
+          :aria-label="t('nc_bitwarden', 'Delete item')"
           @click="confirmDelete"
         >
           <DeleteOutlineIcon :size="18" />
@@ -35,18 +35,18 @@
       <template v-if="item.type === 1 && item.login">
         <section class="bw-detail__group">
           <div class="bw-detail__group-title">
-            Zugangsdaten
+            {{ t('nc_bitwarden', 'Login credentials') }}
           </div>
 
           <div class="bw-detail__grid">
             <FieldRow
-              label="Benutzername"
+              :label="t('nc_bitwarden', 'Username')"
               :value="item.login.username"
               copyable
             />
 
             <FieldRow
-              label="Passwort"
+              :label="t('nc_bitwarden', 'Password')"
               :value="item.login.password"
               copyable
               secret
@@ -57,8 +57,12 @@
               :key="`${uri.uri}-${index}`"
               :label="
                 item.login.uris.length > 1
-                  ? `URL ${index + 1}`
-                  : 'URL'
+                  ? t(
+                    'nc_bitwarden',
+                    'URL {number}',
+                    { number: index + 1 },
+                  )
+                  : t('nc_bitwarden', 'URL')
               "
               :value="uri.uri"
               :href="uri.uri"
@@ -79,31 +83,31 @@
         class="bw-detail__group"
       >
         <div class="bw-detail__group-title">
-          Kartendaten
+          {{ t('nc_bitwarden', 'Card details') }}
         </div>
 
         <div class="bw-detail__grid">
           <FieldRow
-            label="Karteninhaber"
+            :label="t('nc_bitwarden', 'Cardholder')"
             :value="item.card.cardholderName"
             copyable
           />
 
           <FieldRow
-            label="Kartennummer"
+            :label="t('nc_bitwarden', 'Card number')"
             :value="item.card.number"
             copyable
             secret
           />
 
           <FieldRow
-            label="Ablaufdatum"
+            :label="t('nc_bitwarden', 'Expiration date')"
             :value="expirationDate"
             copyable
           />
 
           <FieldRow
-            label="CVV"
+            :label="t('nc_bitwarden', 'CVV')"
             :value="item.card.code"
             copyable
             secret
@@ -116,36 +120,36 @@
         class="bw-detail__group"
       >
         <div class="bw-detail__group-title">
-          Identität
+          {{ t('nc_bitwarden', 'Identity') }}
         </div>
 
         <div class="bw-detail__grid">
           <FieldRow
-            label="Name"
+            :label="t('nc_bitwarden', 'Name')"
             :value="identityName"
             copyable
           />
 
           <FieldRow
-            label="E-Mail"
+            :label="t('nc_bitwarden', 'Email')"
             :value="item.identity.email"
             copyable
           />
 
           <FieldRow
-            label="Telefon"
+            :label="t('nc_bitwarden', 'Phone')"
             :value="item.identity.phone"
             copyable
           />
 
           <FieldRow
-            label="Firma"
+            :label="t('nc_bitwarden', 'Company')"
             :value="item.identity.company"
             copyable
           />
 
           <FieldRow
-            label="Adresse"
+            :label="t('nc_bitwarden', 'Address')"
             :value="item.identity.address1"
             copyable
             wide
@@ -158,7 +162,7 @@
         class="bw-detail__group"
       >
         <div class="bw-detail__group-title">
-          Notizen
+          {{ t('nc_bitwarden', 'Notes') }}
         </div>
 
         <article class="bw-detail__notes-card">
@@ -167,8 +171,8 @@
           <button
             type="button"
             class="bw-detail__copy-notes"
-            title="Notizen kopieren"
-            aria-label="Notizen kopieren"
+            :title="t('nc_bitwarden', 'Copy notes')"
+            :aria-label="t('nc_bitwarden', 'Copy notes')"
             @click="copyNotes"
           >
             <ContentCopyIcon :size="18" />
@@ -189,14 +193,18 @@
         class="bw-detail__group"
       >
         <div class="bw-detail__group-title">
-          Zusätzliche Felder
+          {{ t('nc_bitwarden', 'Additional fields') }}
         </div>
 
         <div class="bw-detail__grid">
           <FieldRow
             v-for="(field, index) in item.fields"
             :key="`${field.name}-${index}`"
-            :label="field.name || `Feld ${index + 1}`"
+            :label="field.name || t(
+              'nc_bitwarden',
+              'Field {number}',
+              { number: index + 1 },
+            )"
             :value="field.value"
             :secret="field.type === 1"
             copyable
@@ -213,13 +221,14 @@ import {
   onBeforeUnmount,
   ref,
 } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import PencilOutlineIcon from 'vue-material-design-icons/PencilOutline.vue'
 import DeleteOutlineIcon from 'vue-material-design-icons/DeleteOutline.vue'
 import ContentCopyIcon from 'vue-material-design-icons/ContentCopy.vue'
 import FieldRow from './FieldRow.vue'
 import TotpDisplay from './TotpDisplay.vue'
-import { BitwardenApi } from '../services/api.js'
+import { VaultwardenApi } from '../services/api.js'
 
 const props = defineProps({
   item: {
@@ -238,6 +247,10 @@ const emit = defineEmits([
 ])
 
 const notesMessage = ref('')
+
+const itemName = computed(() =>
+  props.item.name || t('nc_bitwarden', '(no name)'),
+)
 
 let notesTimer = null
 
@@ -267,13 +280,17 @@ const identityName = computed(() =>
 async function confirmDelete() {
   if (
     !confirm(
-      `"${props.item.name}" wirklich löschen?`,
+      t(
+        'nc_bitwarden',
+        'Really delete {name}?',
+        { name: itemName.value },
+      ),
     )
   ) {
     return
   }
 
-  await BitwardenApi.deleteCipher(props.item.id)
+  await VaultwardenApi.deleteCipher(props.item.id)
   emit('delete', props.item.id)
 }
 
@@ -306,8 +323,8 @@ async function copyNotes() {
   )
 
   notesMessage.value = copied
-    ? 'Notizen wurden kopiert.'
-    : 'Notizen konnten nicht kopiert werden.'
+    ? t('nc_bitwarden', 'Notes were copied.')
+    : t('nc_bitwarden', 'Notes could not be copied.')
 
   if (notesTimer) {
     clearTimeout(notesTimer)

@@ -1,13 +1,15 @@
 <template>
   <NcDialog
-    :name="folder ? 'Ordner umbenennen' : 'Neuer persönlicher Ordner'"
+    :name="folder
+      ? t('nc_bitwarden', 'Rename folder')
+      : t('nc_bitwarden', 'New personal folder')"
     size="small"
     @close="$emit('close')"
   >
     <div class="bw-folder-dialog">
       <NcTextField
         v-model="name"
-        label="Ordnername"
+        :label="t('nc_bitwarden', 'Folder name')"
         :disabled="saving"
         @keyup.enter="save"
       />
@@ -22,7 +24,7 @@
         :disabled="saving"
         @click="$emit('close')"
       >
-        Abbrechen
+        {{ t('nc_bitwarden', 'Cancel') }}
       </NcButton>
 
       <NcButton
@@ -30,7 +32,10 @@
         :disabled="saving || !name.trim()"
         @click="save"
       >
-        {{ saving ? 'Speichern …' : 'Speichern' }}
+        {{ saving
+          ? t('nc_bitwarden', 'Saving…')
+          : t('nc_bitwarden', 'Save')
+        }}
       </NcButton>
     </template>
   </NcDialog>
@@ -38,10 +43,11 @@
 
 <script setup>
 import { ref } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcDialog from '@nextcloud/vue/components/NcDialog'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
-import { BitwardenApi } from '../services/api.js'
+import { VaultwardenApi } from '../services/api.js'
 import {
   decryptEncString,
   encryptString,
@@ -90,14 +96,19 @@ async function save() {
     }
 
     const raw = props.folder
-      ? await BitwardenApi.updateFolder(props.folder.id, payload)
-      : await BitwardenApi.createFolder(payload)
+      ? await VaultwardenApi.updateFolder(props.folder.id, payload)
+      : await VaultwardenApi.createFolder(payload)
 
     const id = responseValue(raw, 'Id', 'id')
     const returnedName = responseValue(raw, 'Name', 'name')
 
     if (!id || !returnedName) {
-      throw new Error('Vaultwarden hat keinen vollständigen Ordner zurückgegeben.')
+      throw new Error(
+        t(
+          'nc_bitwarden',
+          'Vaultwarden did not return a complete folder.',
+        ),
+      )
     }
 
     const decryptedName = await decryptEncString(
@@ -111,10 +122,16 @@ async function save() {
       name: decryptedName,
     })
   } catch (exception) {
-    console.error('[nc_bitwarden] Ordner konnte nicht gespeichert werden:', exception)
+    console.error(
+      '[nc_bitwarden] Folder could not be saved:',
+      exception,
+    )
     error.value = exception?.response?.data?.error
       || exception?.message
-      || 'Der Ordner konnte nicht gespeichert werden.'
+      || t(
+        'nc_bitwarden',
+        'The folder could not be saved.',
+      )
   } finally {
     saving.value = false
   }

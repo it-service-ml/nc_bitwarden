@@ -1,13 +1,15 @@
 <template>
   <NcDialog
-    :name="collection ? 'Sammlung umbenennen' : 'Neue Sammlung'"
+    :name="collection
+      ? t('nc_bitwarden', 'Rename collection')
+      : t('nc_bitwarden', 'New collection')"
     size="small"
     @close="$emit('close')"
   >
     <div class="bw-collection-dialog">
       <div class="bw-collection-dialog__field">
         <label for="bw-collection-organization">
-          Organisation
+          {{ t('nc_bitwarden', 'Organization') }}
         </label>
 
         <select
@@ -27,7 +29,7 @@
 
       <div class="bw-collection-dialog__field">
         <label for="bw-collection-parent">
-          Unterhalb von
+          {{ t('nc_bitwarden', 'Below') }}
         </label>
 
         <NcSelect
@@ -39,19 +41,19 @@
           :clearable="false"
           :searchable="true"
           :disabled="saving"
-          placeholder="Sammlung suchen …"
+          :placeholder="t('nc_bitwarden', 'Search collection…')"
         />
       </div>
 
       <NcTextField
         v-model="name"
-        label="Name der Sammlung"
+        :label="t('nc_bitwarden', 'Collection name')"
         :disabled="saving"
         @keyup.enter="save"
       />
 
       <p class="bw-collection-dialog__preview">
-        Vollständiger Pfad:
+        {{ t('nc_bitwarden', 'Full path:') }}
         <strong>{{ completePath || '–' }}</strong>
       </p>
 
@@ -65,7 +67,7 @@
         :disabled="saving"
         @click="$emit('close')"
       >
-        Abbrechen
+        {{ t('nc_bitwarden', 'Cancel') }}
       </NcButton>
 
       <NcButton
@@ -73,7 +75,10 @@
         :disabled="saving || !canSave"
         @click="save"
       >
-        {{ saving ? 'Speichern …' : 'Speichern' }}
+        {{ saving
+          ? t('nc_bitwarden', 'Saving…')
+          : t('nc_bitwarden', 'Save')
+        }}
       </NcButton>
     </template>
   </NcDialog>
@@ -81,11 +86,12 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcDialog from '@nextcloud/vue/components/NcDialog'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
-import { BitwardenApi } from '../services/api.js'
+import { VaultwardenApi } from '../services/api.js'
 import {
   decryptEncString,
   encryptString,
@@ -155,7 +161,7 @@ const availableParents = computed(() => {
       || !String(candidate.name).startsWith(`${currentPath}/`),
     )
     .sort((a, b) =>
-      String(a.name).localeCompare(String(b.name), 'de', {
+      String(a.name).localeCompare(String(b.name), undefined, {
         sensitivity: 'base',
         numeric: true,
       }),
@@ -165,7 +171,7 @@ const availableParents = computed(() => {
 const parentOptions = computed(() => [
   {
     value: '',
-    label: 'Oberste Ebene',
+    label: t('nc_bitwarden', 'Top level'),
   },
   ...availableParents.value.map(parent => ({
     value: parent.name,
@@ -212,7 +218,7 @@ async function buildCollectionUpdatePayload(
   collectionId,
   encryptedName,
 ) {
-  const details = await BitwardenApi.getCollectionDetails(
+  const details = await VaultwardenApi.getCollectionDetails(
     organizationId.value,
     collectionId,
   )
@@ -241,7 +247,10 @@ async function save() {
 
     if (!orgKey) {
       throw new Error(
-        'Der Organisationsschlüssel ist nicht verfügbar.',
+        t(
+          'nc_bitwarden',
+          'The organization key is not available.',
+        ),
       )
     }
 
@@ -284,7 +293,7 @@ async function save() {
         .sort((a, b) =>
           String(a.name).localeCompare(
             String(b.name),
-            'de',
+            undefined,
             {
               sensitivity: 'base',
               numeric: true,
@@ -328,7 +337,7 @@ async function save() {
         encryptedName,
       )
 
-      raw = await BitwardenApi.updateCollection(
+      raw = await VaultwardenApi.updateCollection(
         organizationId.value,
         props.collection.id,
         payload,
@@ -339,14 +348,14 @@ async function save() {
        * auf den neuen vollständigen Pfad umstellen.
        */
       for (const update of descendantUpdates) {
-        await BitwardenApi.updateCollection(
+        await VaultwardenApi.updateCollection(
           organizationId.value,
           update.collection.id,
           update.payload,
         )
       }
     } else {
-      raw = await BitwardenApi.createCollection(
+      raw = await VaultwardenApi.createCollection(
         organizationId.value,
         {
           name: encryptedName,
@@ -365,7 +374,10 @@ async function save() {
 
     if (!returnedName) {
       throw new Error(
-        'Vaultwarden hat keine vollständige Sammlung zurückgegeben.',
+        t(
+          'nc_bitwarden',
+          'Vaultwarden did not return a complete collection.',
+        ),
       )
     }
 
@@ -416,7 +428,7 @@ async function save() {
     })
   } catch (exception) {
     console.error(
-      '[nc_bitwarden] Sammlung konnte nicht gespeichert werden:',
+      '[nc_bitwarden] Collection could not be saved:',
       exception,
     )
 
@@ -424,7 +436,10 @@ async function save() {
       exception?.response?.data?.error
       || exception?.response?.data?.message
       || exception?.message
-      || 'Die Sammlung konnte nicht gespeichert werden.'
+      || t(
+        'nc_bitwarden',
+        'The collection could not be saved.',
+      )
   } finally {
     saving.value = false
   }

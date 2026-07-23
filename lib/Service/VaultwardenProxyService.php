@@ -5,7 +5,7 @@ namespace OCA\NcBitwarden\Service;
 use OCP\Http\Client\IClientService;
 use OCP\ISession;
 
-final class BitwardenProxyService {
+final class VaultwardenProxyService {
 	private const SESSION_TOKEN_KEY = 'bw_access_token';
 	private const SESSION_REFRESH_KEY = 'bw_refresh_token';
 	private const SESSION_EXPIRY_KEY = 'bw_token_expiry';

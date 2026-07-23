@@ -2,25 +2,39 @@
   <div class="bw-vault">
     <!-- Suchleiste -->
     <div class="bw-vault__search">
-      <NcTextField v-model="search" :label="t('Suchen...')" />
+      <NcTextField v-model="search" :label="t('nc_bitwarden', 'Search…')" />
     </div>
 
     <!-- Sortierung -->
     <div class="bw-vault__sort">
-      <label for="bw-vault-sort">Sortierung</label>
+      <label for="bw-vault-sort">
+        {{ t('nc_bitwarden', 'Sort') }}
+      </label>
       <select id="bw-vault-sort" v-model="sortMode">
-        <option value="name-asc">Name A–Z</option>
-        <option value="name-desc">Name Z–A</option>
-        <option value="favorites">Favoriten zuerst</option>
-        <option value="modified-desc">Zuletzt geändert</option>
-        <option value="modified-asc">Älteste zuerst</option>
+        <option value="name-asc">
+          {{ t('nc_bitwarden', 'Name A–Z') }}
+        </option>
+        <option value="name-desc">
+          {{ t('nc_bitwarden', 'Name Z–A') }}
+        </option>
+        <option value="favorites">
+          {{ t('nc_bitwarden', 'Favorites first') }}
+        </option>
+        <option value="modified-desc">
+          {{ t('nc_bitwarden', 'Recently modified') }}
+        </option>
+        <option value="modified-asc">
+          {{ t('nc_bitwarden', 'Oldest first') }}
+        </option>
       </select>
     </div>
 
     <div class="bw-vault__navigation">
       <!-- Kategorien -->
       <div class="bw-vault__folders">
-        <div class="bw-vault__section-title">Kategorien</div>
+        <div class="bw-vault__section-title">
+          {{ t('nc_bitwarden', 'Categories') }}
+        </div>
 
         <button
           v-for="category in categories"
@@ -46,13 +60,21 @@
       <!-- Ordner -->
       <div class="bw-vault__folders">
         <div class="bw-vault__section-heading">
-          <div class="bw-vault__section-title">Ordner</div>
+          <div class="bw-vault__section-title">
+            {{ t('nc_bitwarden', 'Folders') }}
+          </div>
 
           <button
             type="button"
             class="bw-vault__section-action"
-            title="Neuen persönlichen Ordner erstellen"
-            aria-label="Neuen persönlichen Ordner erstellen"
+            :title="t(
+              'nc_bitwarden',
+              'Create new personal folder',
+            )"
+            :aria-label="t(
+              'nc_bitwarden',
+              'Create new personal folder',
+            )"
             @click="$emit('create-folder')"
           >
             <PlusIcon :size="18" />
@@ -65,7 +87,7 @@
           @click="selectFolder('__none__')"
         >
           <FolderOutlineIcon :size="17" class="bw-folder__icon" />
-          Ohne persönlichen Ordner
+          {{ t('nc_bitwarden', 'No personal folder') }}
           <span class="bw-folder__count">{{ folderCount(null) }}</span>
         </button>
 
@@ -101,8 +123,16 @@
             <button
               type="button"
               class="bw-folder-row__action"
-              :title="`Ordner ${folder.name} umbenennen`"
-              :aria-label="`Ordner ${folder.name} umbenennen`"
+              :title="t(
+                'nc_bitwarden',
+                'Rename folder {name}',
+                { name: folder.name },
+              )"
+              :aria-label="t(
+                'nc_bitwarden',
+                'Rename folder {name}',
+                { name: folder.name },
+              )"
               @click.stop="$emit('edit-folder', folder)"
             >
               <PencilOutlineIcon :size="16" />
@@ -111,8 +141,16 @@
             <button
               type="button"
               class="bw-folder-row__action"
-              :title="`Ordner ${folder.name} löschen`"
-              :aria-label="`Ordner ${folder.name} löschen`"
+              :title="t(
+                'nc_bitwarden',
+                'Delete folder {name}',
+                { name: folder.name },
+              )"
+              :aria-label="t(
+                'nc_bitwarden',
+                'Delete folder {name}',
+                { name: folder.name },
+              )"
               @click.stop="$emit('delete-folder', folder)"
             >
               <DeleteOutlineIcon :size="16" />
@@ -128,15 +166,15 @@
       >
         <div class="bw-vault__section-heading">
           <div class="bw-vault__section-title">
-            Sammlungen
+            {{ t('nc_bitwarden', 'Collections') }}
           </div>
 
           <button
             v-if="canCreateCollection"
             type="button"
             class="bw-vault__section-action"
-            title="Neue Sammlung erstellen"
-            aria-label="Neue Sammlung erstellen"
+            :title="t('nc_bitwarden', 'Create new collection')"
+            :aria-label="t('nc_bitwarden', 'Create new collection')"
             @click="$emit('create-collection')"
           >
             <PlusIcon :size="18" />
@@ -152,15 +190,15 @@
           <input
             v-model="collectionSearch"
             type="search"
-            placeholder="Sammlungen durchsuchen …"
+            :placeholder="t('nc_bitwarden', 'Search collections…')"
             autocomplete="off"
           >
 
           <button
             v-if="collectionSearch"
             type="button"
-            title="Sammlungssuche leeren"
-            aria-label="Sammlungssuche leeren"
+            :title="t('nc_bitwarden', 'Clear collection search')"
+            :aria-label="t('nc_bitwarden', 'Clear collection search')"
             @click="collectionSearch = ''"
           >
             <CloseIcon :size="16" />
@@ -171,7 +209,11 @@
           v-if="collectionSearch"
           class="bw-collection-search__summary"
         >
-          {{ collectionMatchCount }} Treffer
+          {{ t(
+            'nc_bitwarden',
+            'Results: {count}',
+            { count: collectionMatchCount },
+          ) }}
         </div>
 
         <div
@@ -239,8 +281,16 @@
               v-if="collection.canManage"
               type="button"
               class="bw-folder-row__action"
-              :title="`Sammlung ${collection.path} umbenennen`"
-              :aria-label="`Sammlung ${collection.path} umbenennen`"
+              :title="t(
+                'nc_bitwarden',
+                'Rename collection {name}',
+                { name: collection.path },
+              )"
+              :aria-label="t(
+                'nc_bitwarden',
+                'Rename collection {name}',
+                { name: collection.path },
+              )"
               @click.stop="$emit('edit-collection', collection)"
             >
               <PencilOutlineIcon :size="16" />
@@ -250,8 +300,16 @@
               v-if="collection.canDelete"
               type="button"
               class="bw-folder-row__action"
-              :title="`Sammlung ${collection.path} löschen`"
-              :aria-label="`Sammlung ${collection.path} löschen`"
+              :title="t(
+                'nc_bitwarden',
+                'Delete collection {name}',
+                { name: collection.path },
+              )"
+              :aria-label="t(
+                'nc_bitwarden',
+                'Delete collection {name}',
+                { name: collection.path },
+              )"
               @click.stop="$emit('delete-collection', collection)"
             >
               <DeleteOutlineIcon :size="16" />
@@ -267,14 +325,14 @@
         <template #icon>
           <KeyOutlineIcon :size="16" />
         </template>
-        Passwort generieren
+        {{ t('nc_bitwarden', 'Generate password') }}
       </NcButton>
 
       <NcButton @click="$emit('logout')">
         <template #icon>
           <LogoutIcon :size="16" />
         </template>
-        Abmelden
+        {{ t('nc_bitwarden', 'Log out') }}
       </NcButton>
     </div>
   </div>
@@ -282,6 +340,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import ViewListOutlineIcon from 'vue-material-design-icons/ViewListOutline.vue'
@@ -332,47 +391,46 @@ const selectedCategory = ref('all')
 const sortMode = ref('name-asc')
 const collapsedCollectionPaths = ref(new Set())
 const collectionSearch = ref('')
-const t = (s) => s
 
 const categories = [
   {
     id: 'all',
-    label: 'Alle Einträge',
+    label: t('nc_bitwarden', 'All items'),
     icon: ViewListOutlineIcon,
   },
   {
     id: 'favorites',
-    label: 'Favoriten',
+    label: t('nc_bitwarden', 'Favorites'),
     icon: StarOutlineIcon,
   },
   {
     id: 'logins',
-    label: 'Logins',
+    label: t('nc_bitwarden', 'Logins'),
     icon: KeyOutlineIcon,
   },
   {
     id: 'totp',
-    label: 'TOTP',
+    label: t('nc_bitwarden', 'TOTP'),
     icon: KeyOutlineIcon,
   },
   {
     id: 'notes',
-    label: 'Sichere Notizen',
+    label: t('nc_bitwarden', 'Secure notes'),
     icon: NoteTextOutlineIcon,
   },
   {
     id: 'cards',
-    label: 'Karten',
+    label: t('nc_bitwarden', 'Cards'),
     icon: CreditCardOutlineIcon,
   },
   {
     id: 'identities',
-    label: 'Identitäten',
+    label: t('nc_bitwarden', 'Identities'),
     icon: IdentityOutlineIcon,
   },
 ]
 
-const nameCollator = new Intl.Collator('de', {
+const nameCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
   numeric: true,
 })
@@ -700,11 +758,13 @@ const activeFilterLabel = computed(() => {
       normalizeId(row.id) === selectedCollection.value,
     )
 
-    return collection?.path || collection?.label || 'Sammlung'
+    return collection?.path
+      || collection?.label
+      || t('nc_bitwarden', 'Collection')
   }
 
   if (selectedFolder.value === '__none__') {
-    return 'Ohne persönlichen Ordner'
+    return t('nc_bitwarden', 'No personal folder')
   }
 
   if (selectedFolder.value !== null) {
@@ -712,12 +772,13 @@ const activeFilterLabel = computed(() => {
       normalizeId(candidate.id) === selectedFolder.value,
     )
 
-    return folder?.name || 'Persönlicher Ordner'
+    return folder?.name
+      || t('nc_bitwarden', 'Personal folder')
   }
 
   return categories.find(category =>
     category.id === selectedCategory.value,
-  )?.label || 'Alle Einträge'
+  )?.label || t('nc_bitwarden', 'All items')
 })
 
 watch(

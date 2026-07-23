@@ -1,13 +1,17 @@
 <template>
   <section class="bw-totp">
     <div class="bw-totp__heading">
-      <span>Einmalpasswörter</span>
+      <span>{{ t('nc_bitwarden', 'One-time passwords') }}</span>
 
       <span
         v-if="!error"
         class="bw-totp__countdown"
       >
-        Wechsel in {{ secondsRemaining }} s
+        {{ t(
+          'nc_bitwarden',
+          'Switches in {seconds} s',
+          { seconds: secondsRemaining },
+        ) }}
       </span>
     </div>
 
@@ -22,7 +26,7 @@
       <div class="bw-totp__codes">
         <article class="bw-totp__code-card">
           <div class="bw-totp__code-label">
-            Aktueller Code
+            {{ t('nc_bitwarden', 'Current code') }}
           </div>
 
           <div
@@ -36,7 +40,7 @@
             :disabled="!currentCode"
             @click="copyCode(currentCode, 'current')"
           >
-            Aktuellen Code kopieren
+            {{ t('nc_bitwarden', 'Copy current code') }}
           </NcButton>
         </article>
 
@@ -47,7 +51,7 @@
           "
         >
           <div class="bw-totp__code-label">
-            Nächster Code
+            {{ t('nc_bitwarden', 'Next code') }}
           </div>
 
           <div
@@ -61,7 +65,7 @@
             :disabled="!nextCode"
             @click="copyCode(nextCode, 'next')"
           >
-            Nächsten Code kopieren
+            {{ t('nc_bitwarden', 'Copy next code') }}
           </NcButton>
         </article>
       </div>
@@ -92,6 +96,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import { generateTotpPair } from '../utils/totp.js'
 
@@ -203,7 +208,10 @@ async function refreshCodes() {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Der TOTP-Code konnte nicht erzeugt werden.'
+        : t(
+          'nc_bitwarden',
+          'The TOTP code could not be generated.',
+        )
   } finally {
     refreshing = false
 
@@ -245,9 +253,9 @@ async function copyCode(value, type) {
 
   copyMessage.value = copied
     ? type === 'current'
-      ? 'Aktueller Code wurde kopiert.'
-      : 'Nächster Code wurde kopiert.'
-    : 'Der Code konnte nicht kopiert werden.'
+      ? t('nc_bitwarden', 'Current code was copied.')
+      : t('nc_bitwarden', 'Next code was copied.')
+    : t('nc_bitwarden', 'The code could not be copied.')
 
   if (copyMessageTimer) {
     clearTimeout(copyMessageTimer)
