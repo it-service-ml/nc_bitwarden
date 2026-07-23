@@ -22,6 +22,7 @@
           :selected-id="selectedItem?.id"
           @select="selectedItem = $event; showForm = false"
           @logout="logout"
+          @generate-password="showPasswordGenerator = true"
           @filter-change="onFilterChange"
           @navigate="showVaultList"
           @create-folder="openFolderDialog()"
@@ -102,6 +103,11 @@
       @close="closeCollectionDialog"
       @saved="onCollectionSaved"
     />
+
+    <PasswordGeneratorDialog
+      v-if="showPasswordGenerator"
+      @close="showPasswordGenerator = false"
+    />
   </div>
 </template>
 
@@ -116,6 +122,7 @@ import ItemDetail    from './components/ItemDetail.vue'
 import ItemForm      from './components/ItemForm.vue'
 import FolderDialog  from './components/FolderDialog.vue'
 import CollectionDialog from './components/CollectionDialog.vue'
+import PasswordGeneratorDialog from './components/PasswordGeneratorDialog.vue'
 import { BitwardenApi } from './services/api.js'
 import {
   decryptCipher, decryptEncString,
@@ -154,6 +161,7 @@ const showFolderDialog     = ref(false)
 const editFolder           = ref(null)
 const showCollectionDialog = ref(false)
 const editCollection       = ref(null)
+const showPasswordGenerator = ref(false)
 
 async function onLoggedIn({ masterKey, keepUnlocked = true }) {
   userKey.value    = masterKey
@@ -303,6 +311,7 @@ function resetVaultState() {
   editFolder.value = null
   showCollectionDialog.value = false
   editCollection.value = null
+  showPasswordGenerator.value = false
 }
 
 function logout() {

@@ -263,8 +263,17 @@
 
     <!-- Footer -->
     <div class="bw-vault__footer">
+      <NcButton @click="$emit('generate-password')">
+        <template #icon>
+          <KeyOutlineIcon :size="16" />
+        </template>
+        Passwort generieren
+      </NcButton>
+
       <NcButton @click="$emit('logout')">
-        <template #icon><LogoutIcon :size="16" /></template>
+        <template #icon>
+          <LogoutIcon :size="16" />
+        </template>
         Abmelden
       </NcButton>
     </div>
@@ -305,6 +314,7 @@ const props = defineProps({
 })
 const emit = defineEmits([
   'logout',
+  'generate-password',
   'filter-change',
   'navigate',
   'create-folder',
