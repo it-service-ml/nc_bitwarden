@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<psalm
+    ensureOverrideAttribute="false"
+    autoloader="vendor-bin/nextcloud-ocp/vendor/autoload.php"
+    errorLevel="5"
+    findUnusedCode="false"
+    hideExternalErrors="true"
+    resolveFromConfigFile="true"
+    phpVersion="8.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor-bin/psalm/vendor/vimeo/psalm/config.xsd"
+>
+    <projectFiles>
+        <directory name="lib"/>
+
+        <ignoreFiles>
+            <directory name="vendor"/>
+            <directory name="vendor-bin"/>
+        </ignoreFiles>
+    </projectFiles>
+</psalm>
