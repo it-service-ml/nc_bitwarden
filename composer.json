@@ -1,0 +1,33 @@
+{
+  "name": "it-service-ml/nc-bitwarden",
+  "description": "Native Bitwarden and Vaultwarden integration for Nextcloud",
+  "type": "project",
+  "license": "AGPL-3.0-or-later",
+  "autoload": {
+    "psr-4": {
+      "OCA\\NcBitwarden\\": "lib/"
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "bamarni/composer-bin-plugin": true
+    },
+    "sort-packages": true
+  },
+  "scripts": {
+    "post-install-cmd": [
+      "@composer bin all install --ansi"
+    ],
+    "post-update-cmd": [
+      "@composer bin all install --ansi"
+    ],
+    "lint": "find appinfo lib templates -type f -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "cs:check": "php-cs-fixer fix --dry-run --diff --verbose",
+    "cs:fix": "php-cs-fixer fix --verbose",
+    "psalm": "psalm --no-cache --threads=$(nproc)"
+  },
+  "require": {
+    "php": "^8.1",
+    "bamarni/composer-bin-plugin": "^1.9.1"
+  }
+}

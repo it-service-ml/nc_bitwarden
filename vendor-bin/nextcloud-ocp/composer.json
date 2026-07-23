@@ -1,0 +1,14 @@
+{
+  "config": {
+    "sort-packages": true
+  },
+  "autoload": {
+    "psr-4": {
+      "OCP\\": "vendor/nextcloud/ocp/OCP/",
+      "NCU\\": "vendor/nextcloud/ocp/NCU/"
+    }
+  },
+  "require-dev": {
+    "nextcloud/ocp": "dev-stable34"
+  }
+}

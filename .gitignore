@@ -5,7 +5,10 @@
 # Erzeugte Frontend-Dateien
 /css/
 /js/
-
 # Lokale Sicherungsdateien
 *.bak
 *.pre-*
+# PHP-Entwicklungsabhängigkeiten
+/vendor/
+/vendor-bin/*/vendor/
+/.php-cs-fixer.cache
