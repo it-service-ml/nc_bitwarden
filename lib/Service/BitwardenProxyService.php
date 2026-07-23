@@ -15,6 +15,17 @@ class BitwardenProxyService {
         'connect_timeout' => 10,
     ];
 
+    private const CLIENT_VERSION = '2026.7.0';
+
+    private function clientHeaders(array $headers = []): array {
+        return array_merge(
+            [
+                'Bitwarden-Client-Version' => self::CLIENT_VERSION,
+            ],
+            $headers,
+        );
+    }
+
     public function __construct(
         private IClientService      $httpClientService,
         private ISession            $session,
@@ -33,7 +44,9 @@ class BitwardenProxyService {
                 $urls['identity'] . '/accounts/prelogin',
                 array_merge($this->baseOptions, [
                     'json'    => ['email' => $email],
-                    'headers' => ['Content-Type' => 'application/json'],
+                    'headers' => $this->clientHeaders([
+                        'Content-Type' => 'application/json',
+                    ]),
                 ])
             );
             $data = json_decode($response->getBody(), true);
@@ -74,6 +87,7 @@ class BitwardenProxyService {
             $response = $client->post(
                 $urls['identity'] . '/connect/token',
                 array_merge($this->baseOptions, [
+                    'headers' => $this->clientHeaders(),
                     'form_params' => $formParams,
                 ])
             );
@@ -134,6 +148,7 @@ class BitwardenProxyService {
             $response = $client->post(
                 $urls['identity'] . '/connect/token',
                 array_merge($this->baseOptions, [
+                    'headers' => $this->clientHeaders(),
                     'form_params' => [
                         'grant_type' => 'refresh_token',
                         'refresh_token' => $refreshToken,
@@ -158,10 +173,10 @@ class BitwardenProxyService {
         $token  = $this->session->get(self::SESSION_TOKEN_KEY);
         $client = $this->httpClientService->newClient();
         $options = array_merge($this->baseOptions, [
-            'headers' => [
+            'headers' => $this->clientHeaders([
                 'Authorization' => 'Bearer ' . $token,
-                'Content-Type'  => 'application/json',
-            ],
+                'Content-Type' => 'application/json',
+            ]),
         ]);
         if (!empty($body)) {
             $options['json'] = $body;
@@ -175,7 +190,28 @@ class BitwardenProxyService {
                 default  => throw new \InvalidArgumentException("Unbekannte HTTP-Methode: $method"),
             };
         } catch (\Exception $e) {
-            throw new \RuntimeException($this->extractErrorMessage($e), 0, $e);
+            $status = 502;
+
+            if (
+                method_exists($e, 'getResponse')
+                && ($errorResponse = $e->getResponse()) !== null
+            ) {
+                $upstreamStatus =
+                    (int)$errorResponse->getStatusCode();
+
+                if (
+                    $upstreamStatus >= 400
+                    && $upstreamStatus <= 599
+                ) {
+                    $status = $upstreamStatus;
+                }
+            }
+
+            throw new \RuntimeException(
+                $this->extractErrorMessage($e),
+                $status,
+                $e,
+            );
         }
         $responseBody = $response->getBody();
         return $responseBody ? (json_decode($responseBody, true) ?? []) : [];

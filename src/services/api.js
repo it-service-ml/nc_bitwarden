@@ -43,12 +43,70 @@ export const BitwardenApi = {
 
   async sync()                     { return (await axios.get(base('/api/sync'))).data },
   async getCiphers()               { return (await axios.get(base('/api/ciphers'))).data },
-  async createCipher(data)         { return (await axios.post(base('/api/ciphers'), data)).data },
-  async updateCipher(id, data)     { return (await axios.put(base(`/api/ciphers/${id}`), data)).data },
+  async createCipher(data) {
+    return (
+      await axios.post(base('/api/ciphers'), data)
+    ).data
+  },
+
+  async createOrganizationCipher(data) {
+    return (
+      await axios.post(base('/api/ciphers/create'), data)
+    ).data
+  },
+
+  async updateCipherCollections(id, collectionIds) {
+    return (
+      await axios.post(
+        base(`/api/ciphers/${id}/collections`),
+        { collectionIds },
+      )
+    ).data
+  },
+
+  async updateCipher(id, data) {
+    return (
+      await axios.put(base(`/api/ciphers/${id}`), data)
+    ).data
+  },
   async deleteCipher(id)           { return (await axios.delete(base(`/api/ciphers/${id}`))).data },
 
   async getFolders()               { return (await axios.get(base('/api/folders'))).data },
   async createFolder(data)         { return (await axios.post(base('/api/folders'), data)).data },
   async updateFolder(id, data)     { return (await axios.post(base(`/api/folders/${id}`), data)).data },
   async deleteFolder(id)           { return (await axios.post(base(`/api/folders/${id}/delete`))).data },
+
+  async getCollectionDetails(organizationId, collectionId) {
+    return (
+      await axios.get(
+        base(`/api/organizations/${organizationId}/collections/${collectionId}/details`)
+      )
+    ).data
+  },
+
+  async createCollection(organizationId, data) {
+    return (
+      await axios.post(
+        base(`/api/organizations/${organizationId}/collections`),
+        data,
+      )
+    ).data
+  },
+
+  async updateCollection(organizationId, collectionId, data) {
+    return (
+      await axios.post(
+        base(`/api/organizations/${organizationId}/collections/${collectionId}`),
+        data,
+      )
+    ).data
+  },
+
+  async deleteCollection(organizationId, collectionId) {
+    return (
+      await axios.post(
+        base(`/api/organizations/${organizationId}/collections/${collectionId}/delete`)
+      )
+    ).data
+  },
 }

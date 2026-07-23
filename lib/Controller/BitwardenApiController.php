@@ -73,10 +73,40 @@ class BitwardenApiController extends Controller {
     public function getCiphers(): JSONResponse { return $this->proxy('GET', '/ciphers'); }
 
     #[NoAdminRequired]
-    public function createCipher(): JSONResponse { return $this->proxy('POST', '/ciphers', $this->getJsonBody()); }
+    public function createCipher(): JSONResponse {
+        return $this->proxy(
+            'POST',
+            '/ciphers',
+            $this->getJsonBody()
+        );
+    }
 
     #[NoAdminRequired]
-    public function updateCipher(string $id): JSONResponse { return $this->proxy('PUT', "/ciphers/$id", $this->getJsonBody()); }
+    public function createOrganizationCipher(): JSONResponse {
+        return $this->proxy(
+            'POST',
+            '/ciphers/create',
+            $this->getJsonBody()
+        );
+    }
+
+    #[NoAdminRequired]
+    public function updateCipherCollections(string $id): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/ciphers/$id/collections",
+            $this->getJsonBody()
+        );
+    }
+
+    #[NoAdminRequired]
+    public function updateCipher(string $id): JSONResponse {
+        return $this->proxy(
+            'PUT',
+            "/ciphers/$id",
+            $this->getJsonBody(true)
+        );
+    }
 
     #[NoAdminRequired]
     public function deleteCipher(string $id): JSONResponse { return $this->proxy('DELETE', "/ciphers/$id"); }
@@ -115,13 +145,88 @@ class BitwardenApiController extends Controller {
         return $this->proxy('POST', "/folders/$id/delete");
     }
 
+    #[NoAdminRequired]
+    public function getCollectionDetails(
+        string $organizationId,
+        string $collectionId,
+    ): JSONResponse {
+        return $this->proxy(
+            'GET',
+            "/organizations/$organizationId/collections/$collectionId/details"
+        );
+    }
 
-    private function getJsonBody(): array {
+    #[NoAdminRequired]
+    public function createCollection(string $organizationId): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/organizations/$organizationId/collections",
+            $this->getJsonBody()
+        );
+    }
+
+    #[NoAdminRequired]
+    public function updateCollectionPost(
+        string $organizationId,
+        string $collectionId,
+    ): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/organizations/$organizationId/collections/$collectionId",
+            $this->getJsonBody()
+        );
+    }
+
+    #[NoAdminRequired]
+    public function updateCollectionPut(
+        string $organizationId,
+        string $collectionId,
+    ): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/organizations/$organizationId/collections/$collectionId",
+            $this->getJsonBody()
+        );
+    }
+
+    #[NoAdminRequired]
+    public function deleteCollectionPost(
+        string $organizationId,
+        string $collectionId,
+    ): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/organizations/$organizationId/collections/$collectionId/delete"
+        );
+    }
+
+    #[NoAdminRequired]
+    public function deleteCollectionDelete(
+        string $organizationId,
+        string $collectionId,
+    ): JSONResponse {
+        return $this->proxy(
+            'POST',
+            "/organizations/$organizationId/collections/$collectionId/delete"
+        );
+    }
+
+    private function getJsonBody(
+        bool $preserveOrganizationId = false,
+    ): array {
         $params = $this->request->getParams();
         $this->request->throwDecodingExceptionIfAny();
 
         // URL-Parameter dürfen nicht an Vaultwarden weitergereicht werden.
-        unset($params['id']);
+        unset(
+            $params['id'],
+            $params['collectionId'],
+        );
+
+        // Bei Cipher-Updates ist organizationId ein reguläres Payload-Feld.
+        if (!$preserveOrganizationId) {
+            unset($params['organizationId']);
+        }
 
         return $params;
     }
@@ -130,10 +235,30 @@ class BitwardenApiController extends Controller {
         try {
             return new JSONResponse($this->proxyService->apiRequest($this->userId, $method, $path, $body));
         } catch (\Exception $e) {
-            $this->logger->error('nc_bitwarden: API proxy error', [
-                'method' => $method, 'path' => $path, 'error' => $e->getMessage(),
-            ]);
-            return new JSONResponse(['error' => 'Vault-Anfrage fehlgeschlagen.'], 502);
+            $status = (int)$e->getCode();
+
+            if ($status < 400 || $status > 599) {
+                $status = 502;
+            }
+
+            $message = $status < 500
+                ? ($e->getMessage() ?: 'Vault-Anfrage fehlgeschlagen.')
+                : 'Vault-Anfrage fehlgeschlagen.';
+
+            $this->logger->error(
+                'nc_bitwarden: API proxy error',
+                [
+                    'method' => $method,
+                    'path' => $path,
+                    'status' => $status,
+                    'error' => $e->getMessage(),
+                ],
+            );
+
+            return new JSONResponse(
+                ['error' => $message],
+                $status,
+            );
         }
     }
 }

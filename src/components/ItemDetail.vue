@@ -3,7 +3,22 @@
     <div class="bw-detail__header">
       <h3>{{ item.name }}</h3>
       <div class="bw-detail__actions">
-        <NcButton @click="confirmDelete" type="error"><DeleteOutlineIcon :size="18" /></NcButton>
+        <NcButton
+          title="Eintrag bearbeiten"
+          aria-label="Eintrag bearbeiten"
+          @click="$emit('edit', item)"
+        >
+          <PencilOutlineIcon :size="18" />
+        </NcButton>
+
+        <NcButton
+          type="error"
+          title="Eintrag löschen"
+          aria-label="Eintrag löschen"
+          @click="confirmDelete"
+        >
+          <DeleteOutlineIcon :size="18" />
+        </NcButton>
       </div>
     </div>
 
@@ -45,12 +60,13 @@
 
 <script setup>
 import NcButton   from '@nextcloud/vue/components/NcButton'
+import PencilOutlineIcon from 'vue-material-design-icons/PencilOutline.vue'
 import DeleteOutlineIcon from 'vue-material-design-icons/DeleteOutline.vue'
 import FieldRow   from './FieldRow.vue'
 import { BitwardenApi } from '../services/api.js'
 
 const props = defineProps({ item: Object, userKey: Object })
-const emit  = defineEmits(['update', 'delete'])
+const emit = defineEmits(['edit', 'delete'])
 
 async function confirmDelete() {
   if (!confirm(`"${props.item.name}" wirklich löschen?`)) return

@@ -122,59 +122,147 @@
     </div>
 
     <!-- Organisation-Sammlungen -->
-    <div v-if="collectionRows.length > 0" class="bw-vault__folders">
-      <div class="bw-vault__section-title">Sammlungen</div>
+    <div
+      v-if="collectionRows.length > 0 || canCreateCollection"
+      class="bw-vault__folders"
+    >
+      <div class="bw-vault__section-heading">
+        <div class="bw-vault__section-title">
+          Sammlungen
+        </div>
 
-      <button
+        <button
+          v-if="canCreateCollection"
+          type="button"
+          class="bw-vault__section-action"
+          title="Neue Sammlung erstellen"
+          aria-label="Neue Sammlung erstellen"
+          @click="$emit('create-collection')"
+        >
+          <PlusIcon :size="18" />
+        </button>
+      </div>
+
+      <div
+        v-if="allCollectionRows.length > 0"
+        class="bw-collection-search"
+      >
+        <MagnifyIcon :size="17" />
+
+        <input
+          v-model="collectionSearch"
+          type="search"
+          placeholder="Sammlungen durchsuchen …"
+          autocomplete="off"
+        >
+
+        <button
+          v-if="collectionSearch"
+          type="button"
+          title="Sammlungssuche leeren"
+          aria-label="Sammlungssuche leeren"
+          @click="collectionSearch = ''"
+        >
+          <CloseIcon :size="16" />
+        </button>
+      </div>
+
+      <div
+        v-if="collectionSearch"
+        class="bw-collection-search__summary"
+      >
+        {{ collectionMatchCount }} Treffer
+      </div>
+
+      <div
         v-for="collection in collectionRows"
         :key="collection.id"
-        class="bw-folder bw-collection"
-        :class="{ 'bw-folder--active':
-          selectedCollection === normalizeId(collection.id)
+        class="bw-folder-row"
+        :class="{
+          'bw-folder-row--active':
+            selectedCollection === normalizeId(collection.id),
         }"
-        :style="{
-          paddingLeft: `${0.75 + collection.depth * 1.1}rem`,
-        }"
-        :title="collection.path"
-        @click="selectCollection(collection.id)"
       >
-        <span
-          class="bw-collection__toggle"
-          :class="{ 'bw-collection__toggle--empty': !collection.hasChildren }"
-          @click.stop="toggleCollection(collection)"
+        <button
+          type="button"
+          class="bw-folder bw-folder--main bw-collection"
+          :style="{
+            paddingLeft: `${0.75 + collection.depth * 1.1}rem`,
+          }"
+          :title="collection.path"
+          @click="selectCollection(collection.id)"
         >
-          <ChevronRightIcon
-            v-if="collection.hasChildren && isCollectionCollapsed(collection)"
+          <span
+            class="bw-collection__toggle"
+            :class="{
+              'bw-collection__toggle--empty':
+                !collection.hasChildren,
+            }"
+            @click.stop="toggleCollection(collection)"
+          >
+            <ChevronRightIcon
+              v-if="
+                collection.hasChildren
+                && isCollectionCollapsed(collection)
+              "
+              :size="17"
+            />
+
+            <ChevronDownIcon
+              v-else-if="collection.hasChildren"
+              :size="17"
+            />
+          </span>
+
+          <ArchiveOutlineIcon
             :size="17"
+            class="bw-folder__icon"
           />
-          <ChevronDownIcon
-            v-else-if="collection.hasChildren"
-            :size="17"
-          />
-        </span>
 
-        <ArchiveOutlineIcon
-          :size="17"
-          class="bw-folder__icon"
-        />
+          <span
+            class="bw-collection__name"
+            :title="collection.path"
+          >
+            {{ collection.label }}
+          </span>
 
-        <span class="bw-collection__name">
-          {{ collection.label }}
-        </span>
+          <span class="bw-folder__count">
+            {{ collectionCount(collection.id) }}
+          </span>
+        </button>
 
-        <span class="bw-folder__count">
-          {{ collectionCount(collection.id) }}
-        </span>
-      </button>
+        <div
+          v-if="collection.canManage || collection.canDelete"
+          class="bw-folder-row__actions"
+        >
+          <button
+            v-if="collection.canManage"
+            type="button"
+            class="bw-folder-row__action"
+            :title="`Sammlung ${collection.path} umbenennen`"
+            :aria-label="`Sammlung ${collection.path} umbenennen`"
+            @click.stop="$emit('edit-collection', collection)"
+          >
+            <PencilOutlineIcon :size="16" />
+          </button>
+
+          <button
+            v-if="collection.canDelete"
+            type="button"
+            class="bw-folder-row__action"
+            :title="`Sammlung ${collection.path} löschen`"
+            :aria-label="`Sammlung ${collection.path} löschen`"
+            @click.stop="$emit('delete-collection', collection)"
+          >
+            <DeleteOutlineIcon :size="16" />
+          </button>
+        </div>
+      </div>
     </div>
     </div>
 
     <!-- Footer -->
     <div class="bw-vault__footer">
-      <NcButton @click="$emit('new')" type="primary">
-        <template #icon><PlusIcon :size="16" /></template>
-        Neuer Eintrag
-      </NcButton>
       <NcButton @click="$emit('logout')">
         <template #icon><LogoutIcon :size="16" /></template>
         Abmelden
@@ -199,23 +287,32 @@ import ChevronRightIcon from 'vue-material-design-icons/ChevronRight.vue'
 import ChevronDownIcon from 'vue-material-design-icons/ChevronDown.vue'
 import PencilOutlineIcon from 'vue-material-design-icons/PencilOutline.vue'
 import DeleteOutlineIcon from 'vue-material-design-icons/DeleteOutline.vue'
+import MagnifyIcon from 'vue-material-design-icons/Magnify.vue'
+import CloseIcon from 'vue-material-design-icons/Close.vue'
 import PlusIcon    from 'vue-material-design-icons/Plus.vue'
 import LogoutIcon  from 'vue-material-design-icons/Logout.vue'
+import {
+  collectionMatchesQuery,
+  normalizeCollectionSearch,
+} from '../utils/collectionSearch.js'
 
 const props = defineProps({
   items: Array,
   folders: Array,
   collections: Array,
+  organizations: Array,
   selectedId: String,
 })
 const emit = defineEmits([
-  'new',
   'logout',
   'filter-change',
   'navigate',
   'create-folder',
   'edit-folder',
   'delete-folder',
+  'create-collection',
+  'edit-collection',
+  'delete-collection',
 ])
 
 const search                   = ref('')
@@ -224,6 +321,7 @@ const selectedCollection       = ref(null)
 const selectedCategory         = ref('all')
 const sortMode                 = ref('name-asc')
 const collapsedCollectionPaths = ref(new Set())
+const collectionSearch = ref('')
 const t                = (s) => s
 
 const categories = [
@@ -280,6 +378,12 @@ function normalizePath(value) {
     .join('/')
 }
 
+const canCreateCollection = computed(() =>
+  (props.organizations ?? []).some(
+    organization => organization.canCreateCollections
+  )
+)
+
 const sortedFolders = computed(() => {
   return [...(props.folders ?? [])].sort((a, b) =>
     nameCollator.compare(a.name ?? '', b.name ?? '')
@@ -321,16 +425,81 @@ const allCollectionRows = computed(() => {
   }))
 })
 
+const normalizedCollectionQuery = computed(() =>
+  normalizeCollectionSearch(collectionSearch.value)
+)
+
+const collectionMatchCount = computed(() => {
+  if (!normalizedCollectionQuery.value) {
+    return allCollectionRows.value.length
+  }
+
+  return allCollectionRows.value.filter(row =>
+    collectionMatchesQuery(
+      row,
+      normalizedCollectionQuery.value,
+    )
+  ).length
+})
+
 const collectionRows = computed(() => {
-  return allCollectionRows.value.filter(row => {
+  const rows = allCollectionRows.value
+
+  if (normalizedCollectionQuery.value) {
+    const visibleKeys = new Set()
+
+    rows
+      .filter(row =>
+        collectionMatchesQuery(
+          row,
+          normalizedCollectionQuery.value,
+        )
+      )
+      .forEach(row => {
+        visibleKeys.add(row.nodeKey)
+
+        const parts = row.path.split('/')
+        const organizationId =
+          normalizeId(row.organizationId) ?? ''
+
+        for (
+          let depth = 1;
+          depth < parts.length;
+          depth += 1
+        ) {
+          visibleKeys.add(
+            `${organizationId}:${parts
+              .slice(0, depth)
+              .join('/')}`
+          )
+        }
+      })
+
+    return rows.filter(row =>
+      visibleKeys.has(row.nodeKey)
+    )
+  }
+
+  return rows.filter(row => {
     const parts = row.path.split('/')
-    const organizationId = normalizeId(row.organizationId) ?? ''
+    const organizationId =
+      normalizeId(row.organizationId) ?? ''
 
-    for (let depth = 1; depth < parts.length; depth += 1) {
-      const ancestorPath = parts.slice(0, depth).join('/')
-      const ancestorKey = `${organizationId}:${ancestorPath}`
+    for (
+      let depth = 1;
+      depth < parts.length;
+      depth += 1
+    ) {
+      const ancestorPath =
+        parts.slice(0, depth).join('/')
+      const ancestorKey =
+        `${organizationId}:${ancestorPath}`
 
-      if (collapsedCollectionPaths.value.has(ancestorKey)) {
+      if (
+        collapsedCollectionPaths.value.has(
+          ancestorKey
+        )
+      ) {
         return false
       }
     }
@@ -343,7 +512,9 @@ function selectCategory(categoryId) {
   selectedCategory.value = categoryId
   selectedFolder.value = null
   selectedCollection.value = null
+
   emit('navigate')
+  emitCurrentFilter()
 }
 
 function selectFolder(folderId) {
@@ -353,14 +524,18 @@ function selectFolder(folderId) {
 
   selectedCollection.value = null
   selectedCategory.value = 'all'
+
   emit('navigate')
+  emitCurrentFilter()
 }
 
 function selectCollection(collectionId) {
   selectedCollection.value = normalizeId(collectionId)
   selectedFolder.value = null
   selectedCategory.value = 'all'
+
   emit('navigate')
+  emitCurrentFilter()
 }
 
 function toggleCollection(collection) {
@@ -547,6 +722,33 @@ watch(
 )
 
 watch(
+  () => props.collections,
+  nextCollections => {
+    if (selectedCollection.value === null) {
+      return
+    }
+
+    const collectionStillExists =
+      (nextCollections ?? []).some(collection =>
+        normalizeId(collection.id)
+          === selectedCollection.value
+      )
+
+    if (!collectionStillExists) {
+      selectedCollection.value = null
+      selectedFolder.value = null
+      selectedCategory.value = 'all'
+
+      emit('navigate')
+      emitCurrentFilter()
+    }
+  },
+  {
+    deep: true,
+  },
+)
+
+watch(
   [filtered, activeFilterLabel],
   ([filteredItems, label]) => {
     emit('filter-change', {
@@ -641,6 +843,49 @@ watch(
 
 .bw-vault__section-action:hover {
   background: var(--color-background-hover);
+}
+
+.bw-collection-search {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.2rem 0.6rem 0.45rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-main-background);
+}
+
+.bw-collection-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.1rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-main-text);
+}
+
+.bw-collection-search button {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bw-collection-search button:hover {
+  background: var(--color-background-hover);
+}
+
+.bw-collection-search__summary {
+  padding: 0 0.75rem 0.35rem;
+  color: var(--color-text-maxcontrast);
+  font-size: 0.72rem;
 }
 
 .bw-folder__icon {
