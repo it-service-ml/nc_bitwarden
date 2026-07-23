@@ -16,14 +16,31 @@
         <VaultList
           :items="items"
           :folders="folders"
+          :collections="collections"
           :selected-id="selectedItem?.id"
           @select="selectedItem = $event; showForm = false"
           @new="openNewForm"
           @logout="logout"
+          @filter-change="onFilterChange"
+          @navigate="showVaultList"
         />
       </aside>
 
-      <!-- Hauptbereich -->
+      <!-- Mittlere Spalte: gefilterte Einträge -->
+      <section class="bw-layout__items">
+        <VaultItems
+          :items="visibleItems"
+          :title="activeFilterLabel"
+          :selected-id="selectedItem?.id"
+          @select="
+            selectedItem = $event;
+            showForm = false;
+            editItem = null
+          "
+        />
+      </section>
+
+      <!-- Rechte Spalte: Detailansicht oder Formular -->
       <main class="bw-layout__main">
         <div v-if="loading" class="bw-main__loading">
           <NcLoadingIcon :size="48" />
@@ -34,7 +51,6 @@
           v-else-if="selectedItem && !showForm"
           :item="selectedItem"
           :user-key="userKey"
-          @close="selectedItem = null"
           @delete="onDelete"
           @edit="openEditForm"
         />
@@ -48,12 +64,10 @@
           @saved="onSaved"
         />
 
-        <!-- Leer-State: kein Eintrag gewählt -->
         <div v-else class="bw-main__empty">
-          <LockIcon :size="64" />
+          <LockOutlineIcon :size="56" />
           <h3>Tresor entsperrt</h3>
-          <p>{{ items.length }} {{ items.length === 1 ? 'Eintrag' : 'Einträge' }} geladen</p>
-          <p>Wähle einen Eintrag aus der Liste links</p>
+          <p>Wähle einen Eintrag aus der mittleren Spalte.</p>
         </div>
       </main>
     </div>
@@ -63,9 +77,10 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import LockIcon      from 'vue-material-design-icons/Lock.vue'
+import LockOutlineIcon      from 'vue-material-design-icons/LockOutline.vue'
 import LoginForm     from './components/LoginForm.vue'
 import VaultList     from './components/VaultList.vue'
+import VaultItems    from './components/VaultItems.vue'
 import ItemDetail    from './components/ItemDetail.vue'
 import ItemForm      from './components/ItemForm.vue'
 import { BitwardenApi } from './services/api.js'
@@ -90,9 +105,12 @@ function toPascal(o) {
 const restoringSession = ref(true)
 const isLoggedIn   = ref(false)
 const userKey      = ref(null)
-const items        = ref([])
-const folders      = ref([])
-const selectedItem = ref(null)
+const items             = ref([])
+const folders           = ref([])
+const collections       = ref([])
+const visibleItems      = ref([])
+const activeFilterLabel = ref('Alle Einträge')
+const selectedItem      = ref(null)
 const loading      = ref(false)
 const showForm     = ref(false)
 const editItem     = ref(null)
@@ -140,7 +158,53 @@ async function loadVault() {
         name: await decryptEncString(f.Name, userKey.value.encKey, userKey.value.macKey),
       }))
     )
-    folders.value = folderResults.filter(r => r.status === 'fulfilled').map(r => r.value)
+    folders.value = folderResults
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value)
+
+    // Sammlungen gehören Organisationen und werden mit dem jeweiligen
+    // Organisationsschlüssel entschlüsselt.
+    const collectionResults = await Promise.allSettled(
+      (sync.Collections ?? []).map(async collection => {
+        const orgKey = orgKeys[collection.OrganizationId]
+
+        if (!orgKey) {
+          throw new Error(
+            `Kein Organisationsschlüssel für Sammlung ${collection.Id}`
+          )
+        }
+
+        const name = collection.DefaultUserCollectionEmail
+          || await decryptEncString(
+            collection.Name,
+            orgKey.encKey,
+            orgKey.macKey,
+          )
+
+        return {
+          id: collection.Id,
+          organizationId: collection.OrganizationId,
+          name,
+          readOnly: Boolean(collection.ReadOnly),
+          hidePasswords: Boolean(collection.HidePasswords),
+          manage: Boolean(collection.Manage),
+          type: collection.Type ?? 0,
+        }
+      })
+    )
+
+    const failedCollections = collectionResults
+      .filter(result => result.status === 'rejected')
+
+    if (failedCollections.length > 0) {
+      console.warn(
+        `[nc_bitwarden] ${failedCollections.length} Sammlungen konnten nicht entschlüsselt werden`
+      )
+    }
+
+    collections.value = collectionResults
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value)
 
     // Ciphers – ein Fehler killt nicht alle anderen
     const cipherResults = await Promise.allSettled(
@@ -150,7 +214,10 @@ async function loadVault() {
     if (failed > 0) console.warn(`[nc_bitwarden] ${failed} Einträge konnten nicht entschlüsselt werden`)
     items.value = cipherResults.filter(r => r.status === 'fulfilled').map(r => r.value)
 
-    console.info(`[nc_bitwarden] Vault geladen: ${items.value.length} Einträge, ${folders.value.length} Ordner`)
+    console.info(
+      `[nc_bitwarden] Vault geladen: ${items.value.length} Einträge, `
+      + `${folders.value.length} Ordner, ${collections.value.length} Sammlungen`
+    )
     return true
   } catch (e) {
     console.error('[nc_bitwarden] loadVault Fehler:', e)
@@ -165,6 +232,9 @@ function resetVaultState() {
   isLoggedIn.value = false
   items.value = []
   folders.value = []
+  collections.value = []
+  visibleItems.value = []
+  activeFilterLabel.value = 'Alle Einträge'
   selectedItem.value = null
   showForm.value = false
   editItem.value = null
@@ -196,6 +266,20 @@ onMounted(async () => {
     restoringSession.value = false
   }
 })
+
+function onFilterChange({ items: filteredItems, label }) {
+  visibleItems.value = Array.isArray(filteredItems)
+    ? filteredItems
+    : []
+
+  activeFilterLabel.value = label || 'Alle Einträge'
+}
+
+function showVaultList() {
+  selectedItem.value = null
+  showForm.value = false
+  editItem.value = null
+}
 
 function onDelete(id)      { items.value = items.value.filter(i => i.id !== id); selectedItem.value = null }
 function onSaved(item)     {
@@ -246,6 +330,16 @@ function openEditForm(item){ editItem.value = item; showForm.value = true }
   background:    var(--color-navigation-bg, var(--color-main-background-translucent));
 }
 
+.bw-layout__items {
+  width:         380px;
+  min-width:     320px;
+  max-width:     460px;
+  flex-shrink:   0;
+  overflow:      hidden;
+  border-right:  1px solid var(--color-border);
+  background:    var(--color-main-background);
+}
+
 .bw-layout__main {
   flex:           1;
   overflow-y:     auto;
@@ -255,19 +349,23 @@ function openEditForm(item){ editItem.value = item; showForm.value = true }
   flex-direction: column;
 }
 
-/* ── Leer-State ── */
+/* ── Leerzustand Detailspalte ── */
 .bw-main__empty {
-  display:         flex;
-  flex-direction:  column;
-  align-items:     center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  height:          100%;
-  gap:             0.75rem;
-  color:           var(--color-text-maxcontrast);
-  text-align:      center;
-  padding:         2rem;
+  gap: 0.65rem;
+  padding: 2rem;
+  color: var(--color-text-maxcontrast);
+  text-align: center;
 }
-.bw-main__empty h3 { color: var(--color-main-text); font-size: 1.2rem; }
+
+.bw-main__empty h3,
+.bw-main__empty p {
+  margin: 0;
+}
 
 /* ── Lade-Zustand ── */
 .bw-main__loading {

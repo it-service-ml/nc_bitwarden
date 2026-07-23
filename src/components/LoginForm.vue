@@ -31,8 +31,11 @@
         {{ loading ? 'Einloggen...' : 'Entsperren' }}
       </NcButton>
       <p class="bw-login__hint">
-        🔒 Dein Master-Passwort verlässt niemals diesen Browser.
-        Nur der abgeleitete Hash wird zur Authentifizierung verwendet.
+        <LockOutlineIcon :size="16" />
+        <span>
+          Dein Master-Passwort verlässt niemals diesen Browser.
+          Nur der abgeleitete Hash wird zur Authentifizierung verwendet.
+        </span>
       </p>
     </div>
   </div>

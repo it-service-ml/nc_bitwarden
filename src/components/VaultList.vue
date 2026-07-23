@@ -17,18 +17,27 @@
       </select>
     </div>
 
-    <!-- Kategorien -->
-    <div class="bw-vault__folders">
+    <div class="bw-vault__navigation">
+      <!-- Kategorien -->
+      <div class="bw-vault__folders">
       <div class="bw-vault__section-title">Kategorien</div>
 
       <button
         v-for="category in categories"
         :key="category.id"
         class="bw-folder"
-        :class="{ 'bw-folder--active': selectedCategory === category.id && selectedFolder === null }"
+        :class="{ 'bw-folder--active':
+          selectedCategory === category.id
+          && selectedFolder === null
+          && selectedCollection === null
+        }"
         @click="selectCategory(category.id)"
       >
-        <span class="bw-folder__icon">{{ category.icon }}</span>
+        <component
+          :is="category.icon"
+          :size="17"
+          class="bw-folder__icon"
+        />
         {{ category.label }}
         <span class="bw-folder__count">{{ categoryCount(category.id) }}</span>
       </button>
@@ -43,8 +52,8 @@
         :class="{ 'bw-folder--active': selectedFolder === '__none__' }"
         @click="selectFolder('__none__')"
       >
-        <span class="bw-folder__icon">📂</span>
-        Ohne Ordner
+        <FolderOutlineIcon :size="17" class="bw-folder__icon" />
+        Ohne persönlichen Ordner
         <span class="bw-folder__count">{{ folderCount(null) }}</span>
       </button>
 
@@ -52,32 +61,60 @@
         v-for="folder in sortedFolders"
         :key="folder.id"
         class="bw-folder"
-        :class="{ 'bw-folder--active': selectedFolder === folder.id }"
+        :class="{ 'bw-folder--active': selectedFolder === normalizeId(folder.id) }"
         @click="selectFolder(folder.id)"
       >
-        <FolderIcon :size="16" /> {{ folder.name }}
+        <FolderOutlineIcon :size="17" class="bw-folder__icon" /> {{ folder.name }}
         <span class="bw-folder__count">{{ folderCount(folder.id) }}</span>
       </button>
     </div>
 
-    <!-- Einträge -->
-    <div class="bw-vault__items">
-      <button
-        v-for="item in filtered"
-        :key="item.id"
-        class="bw-item"
-        :class="{ 'bw-item--active': selectedId === item.id }"
-        @click="$emit('select', item)"
-      >
-        <span class="bw-item__icon">{{ typeIcon(item.type) }}</span>
-        <span class="bw-item__name">{{ item.name || '(kein Name)' }}</span>
-        <span v-if="item.favorite" class="bw-item__star">★</span>
-      </button>
+    <!-- Organisation-Sammlungen -->
+    <div v-if="collectionRows.length > 0" class="bw-vault__folders">
+      <div class="bw-vault__section-title">Sammlungen</div>
 
-      <div v-if="filtered.length === 0" class="bw-vault__empty">
-        <LockIcon :size="32" />
-        <p>{{ search ? 'Keine Treffer' : 'Keine Einträge' }}</p>
-      </div>
+      <button
+        v-for="collection in collectionRows"
+        :key="collection.id"
+        class="bw-folder bw-collection"
+        :class="{ 'bw-folder--active':
+          selectedCollection === normalizeId(collection.id)
+        }"
+        :style="{
+          paddingLeft: `${0.75 + collection.depth * 1.1}rem`,
+        }"
+        :title="collection.path"
+        @click="selectCollection(collection.id)"
+      >
+        <span
+          class="bw-collection__toggle"
+          :class="{ 'bw-collection__toggle--empty': !collection.hasChildren }"
+          @click.stop="toggleCollection(collection)"
+        >
+          <ChevronRightIcon
+            v-if="collection.hasChildren && isCollectionCollapsed(collection)"
+            :size="17"
+          />
+          <ChevronDownIcon
+            v-else-if="collection.hasChildren"
+            :size="17"
+          />
+        </span>
+
+        <ArchiveOutlineIcon
+          :size="17"
+          class="bw-folder__icon"
+        />
+
+        <span class="bw-collection__name">
+          {{ collection.label }}
+        </span>
+
+        <span class="bw-folder__count">
+          {{ collectionCount(collection.id) }}
+        </span>
+      </button>
+    </div>
     </div>
 
     <!-- Footer -->
@@ -95,30 +132,69 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import NcButton    from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
-import FolderIcon  from 'vue-material-design-icons/Folder.vue'
-import LockIcon    from 'vue-material-design-icons/Lock.vue'
+import ViewListOutlineIcon from 'vue-material-design-icons/ViewListOutline.vue'
+import StarOutlineIcon from 'vue-material-design-icons/StarOutline.vue'
+import KeyOutlineIcon from 'vue-material-design-icons/KeyOutline.vue'
+import NoteTextOutlineIcon from 'vue-material-design-icons/NoteTextOutline.vue'
+import CreditCardOutlineIcon from 'vue-material-design-icons/CreditCardOutline.vue'
+import IdentityOutlineIcon from 'vue-material-design-icons/CardAccountDetailsOutline.vue'
+import FolderOutlineIcon from 'vue-material-design-icons/FolderOutline.vue'
+import ArchiveOutlineIcon from 'vue-material-design-icons/ArchiveOutline.vue'
+import ChevronRightIcon from 'vue-material-design-icons/ChevronRight.vue'
+import ChevronDownIcon from 'vue-material-design-icons/ChevronDown.vue'
 import PlusIcon    from 'vue-material-design-icons/Plus.vue'
 import LogoutIcon  from 'vue-material-design-icons/Logout.vue'
 
-const props = defineProps({ items: Array, folders: Array, selectedId: String })
-const emit  = defineEmits(['select', 'new', 'logout'])
+const props = defineProps({
+  items: Array,
+  folders: Array,
+  collections: Array,
+  selectedId: String,
+})
+const emit  = defineEmits(['new', 'logout', 'filter-change', 'navigate'])
 
-const search           = ref('')
-const selectedFolder   = ref(null)
-const selectedCategory = ref('all')
-const sortMode         = ref('name-asc')
+const search                   = ref('')
+const selectedFolder           = ref(null)
+const selectedCollection       = ref(null)
+const selectedCategory         = ref('all')
+const sortMode                 = ref('name-asc')
+const collapsedCollectionPaths = ref(new Set())
 const t                = (s) => s
 
 const categories = [
-  { id: 'all',       label: 'Alle Einträge',   icon: '🌐' },
-  { id: 'favorites', label: 'Favoriten',        icon: '★' },
-  { id: 'logins',    label: 'Logins',           icon: '🔑' },
-  { id: 'notes',     label: 'Sichere Notizen',  icon: '📝' },
-  { id: 'cards',     label: 'Karten',            icon: '💳' },
-  { id: 'identities', label: 'Identitäten',      icon: '🪪' },
+  {
+    id: 'all',
+    label: 'Alle Einträge',
+    icon: ViewListOutlineIcon,
+  },
+  {
+    id: 'favorites',
+    label: 'Favoriten',
+    icon: StarOutlineIcon,
+  },
+  {
+    id: 'logins',
+    label: 'Logins',
+    icon: KeyOutlineIcon,
+  },
+  {
+    id: 'notes',
+    label: 'Sichere Notizen',
+    icon: NoteTextOutlineIcon,
+  },
+  {
+    id: 'cards',
+    label: 'Karten',
+    icon: CreditCardOutlineIcon,
+  },
+  {
+    id: 'identities',
+    label: 'Identitäten',
+    icon: IdentityOutlineIcon,
+  },
 ]
 
 const nameCollator = new Intl.Collator('de', {
@@ -126,20 +202,124 @@ const nameCollator = new Intl.Collator('de', {
   numeric: true,
 })
 
+function normalizeId(value) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  return String(value).trim().toLowerCase()
+}
+
+function normalizePath(value) {
+  return String(value ?? '')
+    .split('/')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .join('/')
+}
+
 const sortedFolders = computed(() => {
   return [...(props.folders ?? [])].sort((a, b) =>
     nameCollator.compare(a.name ?? '', b.name ?? '')
   )
 })
 
+const allCollectionRows = computed(() => {
+  const rows = (props.collections ?? [])
+    .map(collection => {
+      const path = normalizePath(collection.name)
+      const parts = path ? path.split('/') : ['(ohne Name)']
+      const organizationId = normalizeId(collection.organizationId) ?? ''
+
+      return {
+        ...collection,
+        path,
+        label: parts[parts.length - 1],
+        depth: Math.max(parts.length - 1, 0),
+        nodeKey: `${organizationId}:${path}`,
+      }
+    })
+    .sort((a, b) => {
+      const organizationDifference = nameCollator.compare(
+        normalizeId(a.organizationId) ?? '',
+        normalizeId(b.organizationId) ?? '',
+      )
+
+      return organizationDifference || nameCollator.compare(a.path, b.path)
+    })
+
+  return rows.map(row => ({
+    ...row,
+    hasChildren: rows.some(candidate =>
+      normalizeId(candidate.organizationId)
+        === normalizeId(row.organizationId)
+      && candidate.path !== row.path
+      && candidate.path.startsWith(`${row.path}/`)
+    ),
+  }))
+})
+
+const collectionRows = computed(() => {
+  return allCollectionRows.value.filter(row => {
+    const parts = row.path.split('/')
+    const organizationId = normalizeId(row.organizationId) ?? ''
+
+    for (let depth = 1; depth < parts.length; depth += 1) {
+      const ancestorPath = parts.slice(0, depth).join('/')
+      const ancestorKey = `${organizationId}:${ancestorPath}`
+
+      if (collapsedCollectionPaths.value.has(ancestorKey)) {
+        return false
+      }
+    }
+
+    return true
+  })
+})
+
 function selectCategory(categoryId) {
   selectedCategory.value = categoryId
   selectedFolder.value = null
+  selectedCollection.value = null
+  emit('navigate')
 }
 
 function selectFolder(folderId) {
-  selectedFolder.value = folderId
+  selectedFolder.value = folderId === '__none__'
+    ? '__none__'
+    : normalizeId(folderId)
+
+  selectedCollection.value = null
   selectedCategory.value = 'all'
+  emit('navigate')
+}
+
+function selectCollection(collectionId) {
+  selectedCollection.value = normalizeId(collectionId)
+  selectedFolder.value = null
+  selectedCategory.value = 'all'
+  emit('navigate')
+}
+
+function toggleCollection(collection) {
+  if (!collection.hasChildren) {
+    selectCollection(collection.id)
+    return
+  }
+
+  const paths = new Set(collapsedCollectionPaths.value)
+
+  if (paths.has(collection.nodeKey)) {
+    paths.delete(collection.nodeKey)
+  } else {
+    paths.add(collection.nodeKey)
+  }
+
+  collapsedCollectionPaths.value = paths
+}
+
+function isCollectionCollapsed(collection) {
+  return collapsedCollectionPaths.value.has(collection.nodeKey)
 }
 
 function categoryMatches(item, categoryId) {
@@ -167,13 +347,25 @@ function categoryCount(categoryId) {
 }
 
 function folderCount(folderId) {
-  return (props.items ?? []).filter(item => {
-    if (folderId === null) {
-      return item.folderId === null || item.folderId === undefined || item.folderId === ''
-    }
+  const normalizedFolderId = normalizeId(folderId)
 
-    return item.folderId === folderId
-  }).length
+  return (props.items ?? []).filter(item =>
+    normalizeId(item.folderId) === normalizedFolderId
+  ).length
+}
+
+function itemBelongsToCollection(item, collectionId) {
+  const normalizedCollectionId = normalizeId(collectionId)
+
+  return (item.collectionIds ?? []).some(itemCollectionId =>
+    normalizeId(itemCollectionId) === normalizedCollectionId
+  )
+}
+
+function collectionCount(collectionId) {
+  return (props.items ?? []).filter(item =>
+    itemBelongsToCollection(item, collectionId)
+  ).length
 }
 
 function compareName(a, b) {
@@ -188,15 +380,17 @@ function revisionTimestamp(item) {
 const filtered = computed(() => {
   let list = [...(props.items ?? [])]
 
-  if (selectedFolder.value === '__none__') {
+  if (selectedCollection.value !== null) {
     list = list.filter(item =>
-      item.folderId === null
-      || item.folderId === undefined
-      || item.folderId === ''
+      itemBelongsToCollection(item, selectedCollection.value)
+    )
+  } else if (selectedFolder.value === '__none__') {
+    list = list.filter(item =>
+      normalizeId(item.folderId) === null
     )
   } else if (selectedFolder.value !== null) {
     list = list.filter(item =>
-      item.folderId === selectedFolder.value
+      normalizeId(item.folderId) === selectedFolder.value
     )
   } else {
     list = list.filter(item =>
@@ -241,9 +435,46 @@ const filtered = computed(() => {
       return list.sort(compareName)
   }
 })
-function typeIcon(t) {
-  return { 1: '🔑', 2: '📝', 3: '💳', 4: '🪪' }[t] ?? '🔒'
-}
+const activeFilterLabel = computed(() => {
+  if (selectedCollection.value !== null) {
+    const collection = allCollectionRows.value.find(row =>
+      normalizeId(row.id) === selectedCollection.value
+    )
+
+    return collection?.path || collection?.label || 'Sammlung'
+  }
+
+  if (selectedFolder.value === '__none__') {
+    return 'Ohne persönlichen Ordner'
+  }
+
+  if (selectedFolder.value !== null) {
+    const folder = (props.folders ?? []).find(candidate =>
+      normalizeId(candidate.id) === selectedFolder.value
+    )
+
+    return folder?.name || 'Persönlicher Ordner'
+  }
+
+  return categories.find(category =>
+    category.id === selectedCategory.value
+  )?.label || 'Alle Einträge'
+})
+
+watch(
+  [filtered, activeFilterLabel],
+  ([filteredItems, label]) => {
+    emit('filter-change', {
+      items: [...filteredItems],
+      label,
+    })
+  },
+  {
+    immediate: true,
+    flush: 'sync',
+  },
+)
+
 </script>
 
 <style scoped>
@@ -283,6 +514,15 @@ function typeIcon(t) {
   color: var(--color-main-text);
 }
 
+.bw-vault__navigation {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .bw-vault__section-title {
   padding: 0.35rem 0.75rem;
   font-size: 0.75rem;
@@ -293,9 +533,31 @@ function typeIcon(t) {
 }
 
 .bw-folder__icon {
-  width: 16px;
+  display: flex;
+  width: 18px;
   flex-shrink: 0;
-  text-align: center;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.bw-collection__toggle {
+  display: flex;
+  width: 18px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.bw-collection__toggle--empty {
+  cursor: default;
+}
+
+.bw-collection__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Ordner ── */
@@ -330,62 +592,10 @@ function typeIcon(t) {
   padding:       0 0.4rem;
 }
 
-/* ── Eintrags-Liste ── */
-.bw-vault__items {
-  flex:           1;
-  overflow-y:     auto;
-  padding:        0.5rem;
-  display:        flex;
-  flex-direction: column;
-  gap:            0.25rem;
-}
-
-/* ── Einzelner Eintrag (Karten-Optik wie Sidebar-Elemente) ── */
-.bw-item {
-  display:       flex;
-  align-items:   center;
-  gap:           0.6rem;
-  width:         100%;
-  padding:       0.55rem 0.75rem;
-  border:        1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  background:    var(--color-main-background);
-  cursor:        pointer;
-  text-align:    left;
-  color:         var(--color-main-text);
-  font-size:     0.9rem;
-  transition:    background 0.15s, border-color 0.15s, box-shadow 0.15s;
-  box-shadow:    0 1px 2px rgba(0,0,0,.04);
-}
-.bw-item:hover {
-  background:   var(--color-background-hover);
-  border-color: var(--color-border-dark, var(--color-primary-element-light));
-  box-shadow:   0 2px 6px rgba(0,0,0,.08);
-}
-.bw-item--active {
-  background:   var(--color-primary-element-light);
-  border-color: var(--color-primary-element);
-  font-weight:  600;
-}
-.bw-item__icon { font-size: 1.1rem; flex-shrink: 0; }
-.bw-item__name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bw-item__star { color: #f4a800; font-size: 0.9rem; }
-
-/* ── Leer-State ── */
-.bw-vault__empty {
-  display:         flex;
-  flex-direction:  column;
-  align-items:     center;
-  justify-content: center;
-  gap:             0.5rem;
-  padding:         2rem;
-  color:           var(--color-text-maxcontrast);
-  text-align:      center;
-}
-
 /* ── Footer ── */
 .bw-vault__footer {
   display:       flex;
+  flex-shrink:   0;
   gap:           0.5rem;
   padding:       0.75rem;
   border-top:    1px solid var(--color-border);

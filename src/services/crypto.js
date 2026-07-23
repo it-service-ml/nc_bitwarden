@@ -219,6 +219,9 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
     id:           cipher.Id,
     type:         cipher.Type,
     folderId:     cipher.FolderId,
+    collectionIds: Array.isArray(cipher.CollectionIds)
+      ? cipher.CollectionIds
+      : [],
     favorite:     cipher.Favorite,
     name:         await dec(cipher.Name),
     notes:        await dec(cipher.Notes),

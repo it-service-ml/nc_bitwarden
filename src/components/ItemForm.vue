@@ -6,7 +6,10 @@
         <div class="bw-form__radio-group">
           <NcCheckboxRadioSwitch v-for="t in typeOptions" :key="t.id"
             v-model="selectedType" :value="t.id" name="item_type" type="radio" :disabled="isEdit">
-            {{ t.label }}
+            <span class="bw-form__type-option">
+              <component :is="t.icon" :size="18" />
+              {{ t.label }}
+            </span>
           </NcCheckboxRadioSwitch>
         </div>
       </div>
@@ -65,6 +68,10 @@ import NcButton               from '@nextcloud/vue/components/NcButton'
 import NcTextField            from '@nextcloud/vue/components/NcTextField'
 import NcPasswordField        from '@nextcloud/vue/components/NcPasswordField'
 import NcCheckboxRadioSwitch  from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
+import KeyOutlineIcon from 'vue-material-design-icons/KeyOutline.vue'
+import NoteTextOutlineIcon from 'vue-material-design-icons/NoteTextOutline.vue'
+import CreditCardOutlineIcon from 'vue-material-design-icons/CreditCardOutline.vue'
+import IdentityOutlineIcon from 'vue-material-design-icons/CardAccountDetailsOutline.vue'
 import { BitwardenApi } from '../services/api.js'
 import { encryptString, decryptCipher } from '../services/crypto.js'
 
@@ -76,8 +83,26 @@ const isEdit       = computed(() => !!props.item?.id)
 const selectedType = ref(props.item?.type ?? 1)
 
 const typeOptions = [
-  { id: 1, label: '🔑 Login' }, { id: 2, label: '📝 Sichere Notiz' },
-  { id: 3, label: '💳 Karte' }, { id: 4, label: '👤 Identität' },
+  {
+    id: 1,
+    label: 'Login',
+    icon: KeyOutlineIcon,
+  },
+  {
+    id: 2,
+    label: 'Sichere Notiz',
+    icon: NoteTextOutlineIcon,
+  },
+  {
+    id: 3,
+    label: 'Karte',
+    icon: CreditCardOutlineIcon,
+  },
+  {
+    id: 4,
+    label: 'Identität',
+    icon: IdentityOutlineIcon,
+  },
 ]
 
 const form = reactive({
@@ -119,6 +144,13 @@ async function save() {
 <style scoped>
 .bw-form__field       { margin-bottom: 0.75rem; }
 .bw-form__label       { display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-maxcontrast); text-transform: uppercase; margin-bottom: 0.25rem; }
+.bw-form__type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: currentColor;
+}
+
 .bw-form__radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .bw-form__textarea    { width: 100%; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--border-radius); background: var(--color-main-background); color: var(--color-main-text); resize: vertical; font-family: inherit; }
 </style>

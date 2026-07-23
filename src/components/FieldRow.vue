@@ -6,8 +6,8 @@
       <span v-else class="field-row__masked">••••••••</span>
       <NcButton v-if="secret" @click="revealed = !revealed" type="tertiary-no-background">
         <template #icon>
-          <EyeOffIcon v-if="revealed" :size="16" />
-          <EyeIcon    v-else          :size="16" />
+          <EyeOffOutlineIcon v-if="revealed" :size="16" />
+          <EyeOutlineIcon    v-else          :size="16" />
         </template>
       </NcButton>
       <NcButton v-if="copyable" @click="copy" type="tertiary-no-background" aria-label="Kopieren">
@@ -20,8 +20,8 @@
 <script setup>
 import { ref } from 'vue'
 import NcButton        from '@nextcloud/vue/components/NcButton'
-import EyeIcon         from 'vue-material-design-icons/Eye.vue'
-import EyeOffIcon      from 'vue-material-design-icons/EyeOff.vue'
+import EyeOutlineIcon         from 'vue-material-design-icons/EyeOutline.vue'
+import EyeOffOutlineIcon      from 'vue-material-design-icons/EyeOffOutline.vue'
 import ContentCopyIcon from 'vue-material-design-icons/ContentCopy.vue'
 
 const props    = defineProps({ label: String, value: String, secret: { type: Boolean, default: false }, copyable: { type: Boolean, default: false } })
