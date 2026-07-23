@@ -351,6 +351,11 @@ const categories = [
     icon: KeyOutlineIcon,
   },
   {
+    id: 'totp',
+    label: 'TOTP',
+    icon: KeyOutlineIcon,
+  },
+  {
     id: 'notes',
     label: 'Sichere Notizen',
     icon: NoteTextOutlineIcon,
@@ -575,6 +580,13 @@ function categoryMatches(item, categoryId) {
       return Boolean(item.favorite)
     case 'logins':
       return Number(item.type) === 1
+    case 'totp':
+      return (
+        Number(item.type) === 1
+        && Boolean(
+          String(item.login?.totp ?? '').trim()
+        )
+      )
     case 'notes':
       return Number(item.type) === 2
     case 'cards':
