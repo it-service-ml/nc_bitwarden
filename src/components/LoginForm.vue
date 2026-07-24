@@ -1,8 +1,12 @@
 <template>
   <div class="bw-login">
     <div class="bw-login__card">
-      <img src="../../img/app.svg" class="bw-login__logo" :alt="t('nc_bitwarden', 'Vaultwarden')">
-      <h2>{{ t('nc_bitwarden', 'Unlock Vaultwarden') }}</h2>
+      <img
+        src="../../img/app.svg"
+        class="bw-login__logo"
+        :alt="providerLabel"
+      >
+      <h2>{{ unlockTitle }}</h2>
       <NcNoteCard v-if="error" type="error">{{ error }}</NcNoteCard>
       <div class="bw-login__field">
         <NcTextField
@@ -61,7 +65,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { t } from '@nextcloud/l10n'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcPasswordField from '@nextcloud/vue/components/NcPasswordField'
@@ -89,17 +93,67 @@ const twoFactorRequired = ref(false)
 const keepUnlocked = ref(true)
 const loading = ref(false)
 const error = ref('')
+const serverType = ref('')
+
+const providerLabel = computed(() => {
+  if (
+    serverType.value === 'cloud_us'
+    || serverType.value === 'cloud_eu'
+  ) {
+    return t('nc_bitwarden', 'Bitwarden')
+  }
+
+  if (serverType.value === 'selfhosted') {
+    return t('nc_bitwarden', 'Vaultwarden')
+  }
+
+  return t('nc_bitwarden', 'Password vault')
+})
+
+const unlockTitle = computed(() => {
+  if (
+    serverType.value === 'cloud_us'
+    || serverType.value === 'cloud_eu'
+  ) {
+    return t('nc_bitwarden', 'Unlock Bitwarden')
+  }
+
+  if (serverType.value === 'selfhosted') {
+    return t('nc_bitwarden', 'Unlock Vaultwarden')
+  }
+
+  return t('nc_bitwarden', 'Unlock password vault')
+})
 
 onMounted(async () => {
-  try {
-    const profile = await VaultwardenApi.getCurrentUserProfile()
-    const profileEmail = profile?.email?.trim()
+  const [
+    settingsResult,
+    profileResult,
+  ] = await Promise.allSettled([
+    VaultwardenApi.getSettings(),
+    VaultwardenApi.getCurrentUserProfile(),
+  ])
+
+  if (settingsResult.status === 'fulfilled') {
+    serverType.value = settingsResult.value?.server_type ?? ''
+  } else {
+    console.warn(
+      '[nc_bitwarden] Provider settings could not be loaded:',
+      settingsResult.reason,
+    )
+  }
+
+  if (profileResult.status === 'fulfilled') {
+    const profileEmail = profileResult.value?.email?.trim()
 
     if (!email.value && profileEmail) {
       email.value = profileEmail
     }
-  } catch (error) {
-    console.warn('[nc_bitwarden] Nextcloud-E-Mail konnte nicht geladen werden:', error)
+  } else {
+    console.warn(
+      '[nc_bitwarden] Nextcloud email could not be loaded:',
+      profileResult.reason,
+    )
   }
 })
 
@@ -184,15 +238,44 @@ async function doLogin() {
 </script>
 
 <style scoped>
-.bw-login        { display: flex; justify-content: center; align-items: center; height: 100%; padding: 2rem; }
-.bw-login__card  { max-width: 400px; width: 100%; padding: 2rem; border-radius: var(--border-radius-large); box-shadow: var(--box-shadow); background: var(--color-main-background); }
-.bw-login__logo  { width: 64px; display: block; margin: 0 auto 1rem; }
-.bw-login__field { margin-bottom: 1rem; }
+.bw-login {
+  display: flex;
+  height: 100%;
+  padding: 2rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.bw-login__card {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem;
+  border-radius: var(--border-radius-large);
+  background: var(--color-main-background);
+  box-shadow: var(--box-shadow);
+}
+
+.bw-login__logo {
+  display: block;
+  width: 64px;
+  margin: 0 auto 0.6rem;
+}
+
+.bw-login__card h2 {
+  margin: 0 0 0.9rem;
+  text-align: center;
+  font-size: 1.65rem;
+  line-height: 1.2;
+}
+
+.bw-login__field {
+  margin-bottom: 0.8rem;
+}
 .bw-login__remember {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin: 0 0 1rem;
+  margin: 0.15rem 0 1rem;
   font-size: 0.9rem;
   cursor: pointer;
 }

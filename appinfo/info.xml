@@ -2,17 +2,18 @@
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
     <id>nc_bitwarden</id>
-    <name>Vaultwarden</name>
-    <summary>Native Vaultwarden integration for Nextcloud</summary>
+    <name>Warden – Bitwarden &amp; Vaultwarden</name>
+    <summary>Native Bitwarden and Vaultwarden integration for Nextcloud</summary>
     <description><![CDATA[
         Access your Vaultwarden or Bitwarden vault directly from Nextcloud.
         Supports bitwarden.com, bitwarden.eu, and self-hosted Vaultwarden instances.
         All decryption takes place client-side in the browser.
         The master password never leaves the browser.
     ]]></description>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <licence>agpl</licence>
-    <author>Philipp Tannich</author>
+    <author>Christian Thiele / Mission Leben IT</author>
+    <author>Philipp Tannich – original author</author>
     <namespace>NcBitwarden</namespace>
     <category>security</category>
     <bugs>https://github.com/it-service-ml/nc_bitwarden/issues</bugs>
@@ -22,13 +23,15 @@
     </dependencies>
     <navigations>
         <navigation>
-            <name>Vaultwarden</name>
+            <name>Warden</name>
             <route>nc_bitwarden.page.index</route>
             <icon>app.svg</icon>
             <order>10</order>
         </navigation>
     </navigations>
     <settings>
+        <admin>OCA\NcBitwarden\Settings\Admin</admin>
+        <admin-section>OCA\NcBitwarden\Settings\AdminSection</admin-section>
         <personal>OCA\NcBitwarden\Settings\Personal</personal>
         <personal-section>OCA\NcBitwarden\Settings\PersonalSection</personal-section>
     </settings>

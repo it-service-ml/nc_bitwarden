@@ -1,14 +1,14 @@
-# 🔐 nc_bitwarden
+# 🔐 Warden
 
-> Native Bitwarden & Vaultwarden Integration for Nextcloud
+> Native Bitwarden & Vaultwarden integration for Nextcloud
 
 ![Nextcloud](https://img.shields.io/badge/Nextcloud-31--34-0082C9?logo=nextcloud&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green)
 ![Security](https://img.shields.io/badge/E2E_Encrypted-✓-brightgreen)
 
-Access your Bitwarden vault directly from Nextcloud – no browser extension required,
-no data shared with third parties. All decryption happens **client-side in the browser**.
+Access your Bitwarden or Vaultwarden vault directly from Nextcloud – no browser
+extension required. All decryption happens **client-side in the browser**.
 Your master password never leaves your device.
 
 ---
@@ -28,6 +28,9 @@ Your master password never leaves your device.
 - ➕ **Create & edit** vault entries
 - 🏢 **Organisation vaults** (shared vaults via RSA-OAEP)
 - 🌍 **Bitwarden Cloud** (US & EU) + **self-hosted Vaultwarden**
+- ⚙️ **Administrator defaults** – centrally configure the provider for all users
+- 🔒 **Provider enforcement** – optionally prevent users from choosing another server
+- 🏷️ **Dynamic provider naming** – Bitwarden or Vaultwarden wording based on the provider
 
 ---
 
@@ -105,13 +108,28 @@ sudo -u www-data php /var/www/html/occ app:enable nc_bitwarden
 
 ### 4. Configure
 
-Nextcloud → **Settings → Personal → Bitwarden**
+#### Administrator configuration
+
+Nextcloud → **Administration settings → Warden**
+
+Administrators can define the default provider for all users:
 
 | Option | Description |
 |---|---|
-| Bitwarden Cloud (US) | `bitwarden.com` – default |
-| Bitwarden Cloud (EU) | `bitwarden.eu` – GDPR compliant |
-| Self-hosted | Your own Bit- or Vaultwarden instance |
+| Bitwarden Cloud (US) | Use `bitwarden.com` |
+| Bitwarden Cloud (EU) | Use `bitwarden.eu` |
+| Self-hosted Vaultwarden | Use a custom HTTPS server URL |
+| Allow user overrides | Permit users to select another provider |
+
+When user overrides are disabled, the administrator configuration is
+enforced for all users.
+
+#### Personal configuration
+
+Nextcloud → **Personal settings → Warden server**
+
+Users can choose their own provider only when this has been enabled by
+the administrator.
 
 ---
 
@@ -190,7 +208,7 @@ nc_bitwarden/
 │   ├── AppInfo/          # Bootstrap
 │   ├── Controller/       # PHP endpoints (API proxy, settings)
 │   ├── Service/          # Bitwarden proxy, user settings
-│   └── Settings/         # NC personal settings page
+│   └── Settings/         # NC administrator and personal settings
 ├── src/
 │   ├── services/
 │   │   ├── api.js        # Axios wrapper for NC backend
@@ -201,7 +219,8 @@ nc_bitwarden/
 │   │   ├── ItemDetail.vue  # Entry detail view
 │   │   ├── ItemForm.vue    # Create / edit dialog
 │   │   ├── FieldRow.vue    # Reusable field row component
-│   │   └── Settings.vue    # Server configuration
+│   │   ├── Settings.vue        # Personal server configuration
+│   │   └── AdminSettings.vue   # Administrator provider defaults
 │   └── App.vue            # Root component + vault loader
 └── templates/             # PHP templates for NC integration
 ```
@@ -236,6 +255,10 @@ compatibility.
 - [x] Live TOTP code display (auto-refresh)
 - [x] Password generator
 - [x] Favourites view
+- [x] Administrator provider defaults and policy enforcement
+- [ ] WebAuthn/FIDO2 two-step login, including YubiKey
+- [ ] Passkey login and vault unlock
+- [ ] SSO login for supported Bitwarden and Vaultwarden servers
 - [ ] Offline cache (Service Worker)
 - [ ] Bitwarden Send support
 
@@ -260,6 +283,11 @@ Pull requests are welcome! Please:
 ---
 
 ## 🙏 Credits
+
+Warden is maintained by **Christian Thiele / Mission Leben IT**.
+
+The original application was created by **Philipp Tannich**. It has since
+been substantially extended and modernised by Mission Leben IT.
 
 - [Bitwarden](https://bitwarden.com) – open-source password manager
 - [Vaultwarden](https://github.com/dani-garcia/vaultwarden) – unofficial Bitwarden-compatible server
