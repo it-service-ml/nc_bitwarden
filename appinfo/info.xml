@@ -12,7 +12,8 @@
     ]]></description>
     <version>1.3.0</version>
     <licence>agpl</licence>
-    <author>Philipp Tannich</author>
+    <author>Christian Thiele / Mission Leben IT</author>
+    <author>Philipp Tannich – original author</author>
     <namespace>NcBitwarden</namespace>
     <category>security</category>
     <bugs>https://github.com/it-service-ml/nc_bitwarden/issues</bugs>
