@@ -7,6 +7,18 @@ export const VaultwardenApi = {
   async getSettings() { return (await axios.get(base('/settings'))).data },
   async saveSettings(data) { return (await axios.post(base('/settings'), data)).data },
 
+  async getAdminSettings() {
+    return (
+      await axios.get(base('/admin-settings'))
+    ).data
+  },
+
+  async saveAdminSettings(data) {
+    return (
+      await axios.post(base('/admin-settings'), data)
+    ).data
+  },
+
   async getCurrentUserProfile() {
     const userId = document.head?.getAttribute('data-user')
 

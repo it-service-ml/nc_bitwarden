@@ -6,40 +6,16 @@
       {{
         t(
           'nc_bitwarden',
-          'Select your vault server and save the settings.',
+          'Choose the default server for all users.',
         )
       }}
     </p>
 
     <NcNoteCard
-      v-if="!canEdit"
-      type="info"
-    >
-      {{
-        t(
-          'nc_bitwarden',
-          'The server is defined by your administrator and cannot be changed.',
-        )
-      }}
-    </NcNoteCard>
-
-    <NcNoteCard
-      v-else-if="inherited"
-      type="info"
-    >
-      {{
-        t(
-          'nc_bitwarden',
-          'You are using the administrator default. Saving creates a personal selection.',
-        )
-      }}
-    </NcNoteCard>
-
-    <NcNoteCard
       v-if="saved"
       type="success"
     >
-      {{ t('nc_bitwarden', 'Settings saved') }}
+      {{ t('nc_bitwarden', 'Administrator settings saved') }}
     </NcNoteCard>
 
     <NcNoteCard
@@ -53,9 +29,9 @@
       <NcCheckboxRadioSwitch
         v-model="form.server_type"
         value="cloud_us"
-        name="server_type"
+        name="admin_server_type"
         type="radio"
-        :disabled="!canEdit || saving"
+        :disabled="loading || saving"
       >
         ☁️
         {{ t('nc_bitwarden', 'Cloud server (US)') }}
@@ -65,9 +41,9 @@
       <NcCheckboxRadioSwitch
         v-model="form.server_type"
         value="cloud_eu"
-        name="server_type"
+        name="admin_server_type"
         type="radio"
-        :disabled="!canEdit || saving"
+        :disabled="loading || saving"
       >
         🇪🇺
         {{ t('nc_bitwarden', 'Cloud server (EU)') }}
@@ -77,9 +53,9 @@
       <NcCheckboxRadioSwitch
         v-model="form.server_type"
         value="selfhosted"
-        name="server_type"
+        name="admin_server_type"
         type="radio"
-        :disabled="!canEdit || saving"
+        :disabled="loading || saving"
       >
         🏠
         {{ t('nc_bitwarden', 'Self-hosted Vaultwarden server') }}
@@ -101,14 +77,34 @@
               'Base URL without /api or /identity',
             )
         "
-        :disabled="!canEdit || saving"
+        :disabled="loading || saving"
       />
     </div>
 
+    <div class="bw-settings__override">
+      <NcCheckboxRadioSwitch
+        v-model="form.allow_user_override"
+        type="switch"
+        :disabled="loading || saving"
+        :description="
+          t(
+            'nc_bitwarden',
+            'When disabled, all users must use this server.',
+          )
+        "
+      >
+        {{
+          t(
+            'nc_bitwarden',
+            'Allow users to choose a different server',
+          )
+        }}
+      </NcCheckboxRadioSwitch>
+    </div>
+
     <NcButton
-      v-if="canEdit"
       type="primary"
-      :disabled="saving || !!urlError"
+      :disabled="loading || saving || !!urlError"
       @click="save"
     >
       {{
@@ -137,13 +133,13 @@ import { VaultwardenApi } from '../services/api.js'
 const form = reactive({
   server_type: 'cloud_us',
   custom_url: '',
+  allow_user_override: true,
 })
 
-const canEdit = ref(true)
-const inherited = ref(false)
+const loading = ref(true)
+const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
-const saving = ref(false)
 
 const urlError = computed(() => {
   if (
@@ -171,17 +167,18 @@ const urlError = computed(() => {
 
 onMounted(async () => {
   try {
-    const settings = await VaultwardenApi.getSettings()
+    const settings = await VaultwardenApi.getAdminSettings()
 
     form.server_type = settings.server_type
     form.custom_url = settings.custom_url
-    canEdit.value = settings.can_edit !== false
-    inherited.value = settings.inherited === true
+    form.allow_user_override = settings.allow_user_override
   } catch {
     error.value = t(
       'nc_bitwarden',
-      'Settings could not be loaded',
+      'Administrator settings could not be loaded',
     )
+  } finally {
+    loading.value = false
   }
 })
 
@@ -195,12 +192,12 @@ async function save() {
   error.value = ''
 
   try {
-    await VaultwardenApi.saveSettings({
+    await VaultwardenApi.saveAdminSettings({
       server_type: form.server_type,
       custom_url: form.custom_url,
+      allow_user_override: form.allow_user_override,
     })
 
-    inherited.value = false
     saved.value = true
 
     setTimeout(() => {
@@ -210,7 +207,7 @@ async function save() {
     error.value = exception.response?.data?.error
       ?? t(
         'nc_bitwarden',
-        'Failed to save settings',
+        'Failed to save administrator settings',
       )
   } finally {
     saving.value = false
@@ -220,7 +217,7 @@ async function save() {
 
 <style scoped>
 .bw-settings {
-  max-width: 560px;
+  max-width: 620px;
   padding: 1rem 0;
 }
 
@@ -233,10 +230,14 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin: 1rem 0;
+  margin-bottom: 1rem;
 }
 
 .bw-settings__custom {
   margin-bottom: 1rem;
+}
+
+.bw-settings__override {
+  margin: 1rem 0;
 }
 </style>

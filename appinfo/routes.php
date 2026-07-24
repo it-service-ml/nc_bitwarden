@@ -28,6 +28,9 @@ return [
 		['name' => 'vaultwarden_api#deleteCollectionPost',    'url' => '/api/organizations/{organizationId}/collections/{collectionId}/delete',  'verb' => 'POST'],
 		['name' => 'vaultwarden_api#deleteCollectionDelete',  'url' => '/api/organizations/{organizationId}/collections/{collectionId}',         'verb' => 'DELETE'],
 
+		['name' => 'admin_settings#getSettings',  'url' => '/admin-settings', 'verb' => 'GET'],
+		['name' => 'admin_settings#saveSettings', 'url' => '/admin-settings', 'verb' => 'POST'],
+
 		['name' => 'settings#getSettings',  'url' => '/settings', 'verb' => 'GET'],
 		['name' => 'settings#saveSettings', 'url' => '/settings', 'verb' => 'POST'],
 	],
