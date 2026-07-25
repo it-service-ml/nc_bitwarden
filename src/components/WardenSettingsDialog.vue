@@ -63,7 +63,7 @@
           </NcNoteCard>
 
           <NcButton
-            type="secondary"
+            variant="secondary"
             :disabled="!canChangeMasterPassword"
             @click="changeMasterPassword"
           >
@@ -457,7 +457,7 @@
 
     <template #actions>
       <NcButton
-        type="secondary"
+        variant="secondary"
         :disabled="saving || changingPassword"
         @click="$emit('close')"
       >
@@ -465,7 +465,7 @@
       </NcButton>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="saving || changingPassword"
         @click="savePreferences"
       >

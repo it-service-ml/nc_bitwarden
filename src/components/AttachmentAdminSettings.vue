@@ -32,7 +32,7 @@
       </p>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="loading || saving"
         @click="save"
       >

@@ -12,7 +12,7 @@ final class VaultwardenProxyService {
 	private const SESSION_EXPIRY_KEY = 'bw_token_expiry';
 
 	private array $baseOptions = [
-		'allow_redirects' => true,
+		'allow_redirects' => false,
 		'timeout' => 15,
 		'connect_timeout' => 10,
 	];

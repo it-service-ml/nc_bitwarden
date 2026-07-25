@@ -239,7 +239,7 @@
       </small>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="primaryDisabled"
         wide
         class="bw-login__primary-action"
@@ -258,7 +258,7 @@
       <NcButton
         v-if="ssoEnabled && classicLoginAllowed"
         class="bw-login__alternative"
-        type="secondary"
+        variant="secondary"
         :disabled="loading"
         wide
         @click="toggleLoginMode"

@@ -28,7 +28,7 @@
             >
               <NcButton
                 v-if="organizationNotice.support_url"
-                type="primary"
+                variant="primary"
                 :href="organizationNotice.support_url"
                 target="_blank"
                 rel="noopener noreferrer"

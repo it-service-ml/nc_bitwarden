@@ -159,7 +159,7 @@
     </div>
 
     <NcButton
-      type="primary"
+      variant="primary"
       :disabled="saving || !!urlError || !!emailError"
       @click="save"
     >

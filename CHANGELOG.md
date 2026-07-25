@@ -2,6 +2,32 @@
 
 All notable changes to Warden are documented in this file.
 
+## 2.0.2 - 2026-07-25
+
+Version 2.0.2 hardens provider network access and refreshes the JavaScript
+dependency tree following the final security review.
+
+### Security
+
+- Disabled redirects for server-side provider API requests
+- Disabled redirects for SSO token and profile requests
+- User-selected self-hosted providers must resolve only to public,
+  non-reserved addresses
+- Administrator-defined inherited providers may continue to use trusted
+  internal DNS
+- Provider URLs containing credentials, query parameters or fragments are
+  rejected
+- Refreshed vulnerable transitive JavaScript dependencies
+- Added separate security gates for production and development dependencies
+
+### Validation
+
+- npm registry signatures checked
+- Production dependency audit checked
+- Complete dependency tree audit checked
+- ESLint and production build checked
+- PHP syntax and application metadata checked
+
 ## 2.0.1 - 2026-07-25
 
 Version 2.0.1 corrects functional, security and documentation issues found

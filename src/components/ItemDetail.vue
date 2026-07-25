@@ -55,7 +55,7 @@
           </NcButton>
 
           <NcButton
-            type="error"
+            variant="error"
             :title="
               t(
                 'nc_bitwarden',
@@ -117,7 +117,7 @@
           </NcButton>
 
           <NcButton
-            type="error"
+            variant="error"
             :title="
               t(
                 'nc_bitwarden',
@@ -791,7 +791,7 @@
               </NcButton>
 
               <NcButton
-                type="primary"
+                variant="primary"
                 :disabled="notesSaving"
                 @click="saveNotesInline"
               >

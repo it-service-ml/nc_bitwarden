@@ -761,6 +761,8 @@ final class UserSettingsService {
 
 	public function getApiUrls(string $userId): array {
 		$settings = $this->resolveProviderSettings($userId);
+		$this->assertResolvedProviderAccessAllowed($settings);
+
 		$type = $settings['server_type'];
 		$customUrl = $settings['custom_url'];
 
@@ -781,6 +783,100 @@ final class UserSettingsService {
 				$this->l->t('Unknown server type'),
 			),
 		};
+	}
+
+	public function assertProviderAccessAllowed(
+		string $userId,
+	): void {
+		$this->assertResolvedProviderAccessAllowed(
+			$this->resolveProviderSettings($userId),
+		);
+	}
+
+	private function assertResolvedProviderAccessAllowed(
+		array $provider,
+	): void {
+		if (
+			($provider['server_type'] ?? '') !== 'selfhosted'
+			|| !empty($provider['inherited'])
+		) {
+			return;
+		}
+
+		$url = (string)($provider['custom_url'] ?? '');
+		$host = parse_url($url, PHP_URL_HOST);
+
+		if (!is_string($host) || $host === '') {
+			throw new \RuntimeException(
+				'The selected provider hostname is invalid.',
+			);
+		}
+
+		$host = strtolower(
+			rtrim($host, '.'),
+		);
+
+		$addresses = $this->resolveHostAddresses(
+			$host,
+		);
+
+		if ($addresses === []) {
+			throw new \RuntimeException(
+				'The selected provider hostname could not be resolved.',
+			);
+		}
+
+		foreach ($addresses as $address) {
+			if (
+				filter_var(
+					$address,
+					FILTER_VALIDATE_IP,
+					FILTER_FLAG_NO_PRIV_RANGE
+						| FILTER_FLAG_NO_RES_RANGE,
+				) === false
+			) {
+				throw new \RuntimeException(
+					'User-selected providers must not resolve to private or reserved addresses.',
+				);
+			}
+		}
+	}
+
+	private function resolveHostAddresses(
+		string $host,
+	): array {
+		$addresses = [];
+
+		$records = @dns_get_record(
+			$host,
+			DNS_A | DNS_AAAA,
+		);
+
+		if (is_array($records)) {
+			foreach ($records as $record) {
+				$address = $record['ip']
+					?? $record['ipv6']
+					?? null;
+
+				if (is_string($address)) {
+					$addresses[] = $address;
+				}
+			}
+		}
+
+		if ($addresses === []) {
+			$ipv4Addresses = @gethostbynamel(
+				$host,
+			);
+
+			if (is_array($ipv4Addresses)) {
+				$addresses = $ipv4Addresses;
+			}
+		}
+
+		return array_values(
+			array_unique($addresses),
+		);
 	}
 
 	private function resolveProviderSettings(string $userId): array {
@@ -870,7 +966,22 @@ final class UserSettingsService {
 			);
 		}
 
-		$host = strtolower($parsed['host']);
+		if (
+			isset($parsed['user'])
+			|| isset($parsed['pass'])
+			|| isset($parsed['query'])
+			|| isset($parsed['fragment'])
+		) {
+			throw new \InvalidArgumentException(
+				$this->l->t(
+					'Provider URLs must not contain credentials, query parameters or fragments',
+				),
+			);
+		}
+
+		$host = strtolower(
+			rtrim((string)$parsed['host'], '.'),
+		);
 
 		if (filter_var($host, FILTER_VALIDATE_IP)) {
 			throw new \InvalidArgumentException(

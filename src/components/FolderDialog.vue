@@ -28,7 +28,7 @@
       </NcButton>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="saving || !name.trim()"
         @click="save"
       >

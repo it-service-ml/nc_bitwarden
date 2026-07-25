@@ -12,13 +12,13 @@
       </div>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="uploading || !ownerKey"
         @click="openFilePicker"
       >
         {{
           uploading
-            ? 'Wird hochgeladen …'
+            ? 'Wird hochgeladen …'
             : 'Datei hinzufügen'
         }}
       </NcButton>
@@ -77,13 +77,13 @@
           >
             {{
               busyAttachmentId === attachment.id
-                ? 'Bitte warten …'
+                ? 'Bitte warten …'
                 : 'Herunterladen'
             }}
           </NcButton>
 
           <NcButton
-            type="error"
+            variant="error"
             :disabled="
               busyAttachmentId === attachment.id
             "

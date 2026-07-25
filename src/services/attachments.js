@@ -133,6 +133,9 @@ async function createAndUploadAttachment(
         'Die verschlüsselte Datei konnte nicht '
           + 'hochgeladen werden.',
       ),
+      {
+        cause: exception,
+      },
     )
   }
 

@@ -62,7 +62,7 @@
       />
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="generating"
         @click="generate"
       >

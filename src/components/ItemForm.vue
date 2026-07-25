@@ -457,7 +457,7 @@
               </div>
 
               <NcButton
-                type="secondary"
+                variant="secondary"
                 @click="addLoginUri"
               >
                 {{ t('nc_bitwarden', 'Add URL') }}
@@ -748,7 +748,7 @@
 
           <NcButton
             v-if="!fieldEditor.open"
-            type="secondary"
+            variant="secondary"
             @click="openCustomFieldEditor"
           >
             {{ t('nc_bitwarden', 'Add field') }}
@@ -839,7 +839,7 @@
                 {{ t('nc_bitwarden', 'Cancel') }}
               </NcButton>
               <NcButton
-                type="primary"
+                variant="primary"
                 :disabled="!canApplyCustomField"
                 @click="applyCustomField"
               >
@@ -863,7 +863,7 @@
         {{ t('nc_bitwarden', 'Cancel') }}
       </NcButton>
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="saving || !canSave"
         @click="save"
       >
@@ -914,11 +914,6 @@ import {
   collectionNameParts,
 } from '../utils/collectionSearch.js'
 
-const FIELD_TYPE_TEXT = 0
-const FIELD_TYPE_HIDDEN = 1
-const FIELD_TYPE_BOOLEAN = 2
-const FIELD_TYPE_LINKED = 3
-
 const props = defineProps({
   userKey: { type: Object, required: true },
   item: { type: Object, default: null },
@@ -952,13 +947,17 @@ const props = defineProps({
 
   generatorPreferences: { type: Object, default: () => ({}) },
 })
-
 const emit = defineEmits([
   'saved',
   'close',
   'attachments-changed',
   'auto-save-failed',
 ])
+const FIELD_TYPE_TEXT = 0
+const FIELD_TYPE_HIDDEN = 1
+const FIELD_TYPE_BOOLEAN = 2
+const FIELD_TYPE_LINKED = 3
+
 const saving = ref(false)
 const error = ref('')
 const collectionSearch = ref('')
