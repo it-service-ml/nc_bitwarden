@@ -2,7 +2,7 @@
 
 > Native Bitwarden and Vaultwarden integration for Nextcloud
 
-![Version](https://img.shields.io/badge/Version-2.0.0-blue)
+![Version](https://img.shields.io/badge/Version-2.0.1-blue)
 ![Nextcloud](https://img.shields.io/badge/Nextcloud-31--34-0082C9?logo=nextcloud&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green)
@@ -29,8 +29,10 @@ Warden can connect to:
 - Self-hosted Vaultwarden instances
 - Compatible self-hosted Bitwarden instances
 
-Self-hosted servers must provide a valid HTTPS endpoint that is reachable from
-the Nextcloud server.
+Self-hosted servers must provide a valid HTTPS endpoint using a DNS hostname
+that is reachable from the Nextcloud server. Literal IP addresses and
+hostnames ending in `.local`, `.internal`, `.lan`, `.corp` or `.home` are
+rejected.
 
 ## Features
 
@@ -38,7 +40,7 @@ the Nextcloud server.
 
 - Classic email and master-password login
 - Vaultwarden TOTP two-step login
-- OIDC single sign-on where supported by the selected server
+- OIDC single sign-on for self-hosted Vaultwarden servers
 - Optional SSO-only operation
 - First-login master-password setup for SSO accounts when required
 - Tab-scoped vault unlock
@@ -61,7 +63,7 @@ Login entries support:
 - Multiple URLs
 - TOTP secrets and live codes
 - Password history
-- Passkey credential information
+- Display, preservation and removal of stored passkey credential metadata
 - Custom text, hidden, boolean and linked fields
 
 SSH keys can be displayed, edited and generated in the browser.
@@ -80,7 +82,7 @@ SSH keys can be displayed, edited and generated in the browser.
 
 ### Attachments
 
-- Encrypted attachment upload
+- Encrypted attachment upload for providers using the direct upload flow
 - Encrypted attachment download
 - Attachment deletion
 - Configurable server-side attachment size limit
@@ -91,7 +93,7 @@ SSH keys can be displayed, edited and generated in the browser.
 - Three-column Nextcloud interface
 - Personal and organization navigation
 - Folder and collection counters
-- Full-text search
+- Full-text search across names, usernames, URLs, notes, non-hidden custom fields, identity metadata, SSH public metadata and attachment names
 - Favorites
 - TOTP category
 - SSH-key category
@@ -104,14 +106,17 @@ SSH keys can be displayed, edited and generated in the browser.
 - Bulk transfer from personal vaults to organizations
 - Inline note editing
 
+Search deliberately excludes passwords, TOTP secrets, SSH private keys and
+hidden custom-field values.
+
 ### Password tools
 
 - Browser-side password generator
 - Browser-side passphrase generator
 - Configurable length and character groups
 - German and English passphrase word lists
-- Password strength indication
-- Password age indication
+- Basic password strength indication
+- Password age indication with fallback estimation for legacy entries
 - Reused-password detection
 - HTTP URL warning
 - Storage of the five most recently replaced passwords
@@ -177,6 +182,12 @@ JavaScript strings and cryptographic values cannot be guaranteed to be
 securely erased from browser memory. This limitation applies to browser-based
 password managers in general.
 
+When tab-scoped unlock is enabled, Warden stores the decrypted user encryption
+and MAC keys as Base64 values in the browser tab's `sessionStorage`. This
+survives page reloads in the same tab but is removed when Warden logs out or
+the tab session ends. Scripts running in the same Nextcloud origin could access
+that storage, so the security of the complete Nextcloud origin is relevant.
+
 ### Clipboard behavior
 
 Warden copies values only after a direct user action.
@@ -206,8 +217,10 @@ keys, are not currently handled by Warden's classic login form.
 
 ### OIDC single sign-on
 
-For servers configured with OIDC SSO, Warden can start and complete the
-provider login directly from Nextcloud.
+For self-hosted Vaultwarden servers configured with OIDC SSO, Warden can
+start and complete the provider login directly from Nextcloud. Warden does not
+currently implement SSO for Bitwarden Cloud or generic self-hosted Bitwarden
+servers.
 
 SSO authenticates the user but does not bypass vault encryption. Depending on
 the provider and account state, a master password may still be required to
@@ -217,7 +230,8 @@ When the server reports that an SSO account does not yet have a master
 password, Warden can guide the user through the initial setup.
 
 An administrator may configure SSO-only operation to prevent use of the
-classic Warden login form.
+classic login form inside Warden. This does not disable classic authentication
+on the Vaultwarden server itself or in other Bitwarden-compatible clients.
 
 ## Requirements
 
@@ -238,7 +252,7 @@ Extract the application into the Nextcloud application directory:
 
 ```bash
 cd /var/www/html/custom_apps
-tar -xzf nc_bitwarden-2.0.0.tar.gz
+tar -xzf nc_bitwarden-2.0.1.tar.gz
 chown -R www-data:www-data nc_bitwarden
 ```
 
@@ -331,19 +345,20 @@ Nextcloud
 Additional vault and generator preferences are available from the settings
 dialog inside Warden.
 
-## Internal and self-hosted servers
+## Self-hosted server restrictions
 
-When the provider uses an internal address, Nextcloud may need permission to
-contact local remote servers:
+Warden accepts only HTTPS base URLs with a hostname. Literal IP addresses and
+common private hostname suffixes are rejected.
 
-```bash
-sudo -u www-data php /var/www/html/occ \
-  config:system:set allow_local_remote_servers \
-  --value=true \
-  --type=bool
-```
+The Nextcloud setting `allow_local_remote_servers` does not override Warden's
+own provider validation. A self-hosted provider should use a valid DNS hostname
+and a certificate trusted by the operating system and PHP environment used by
+Nextcloud.
 
-Only enable this option when local provider URLs are intentionally required.
+Attachment download URLs returned by a provider must use HTTPS and must not
+redirect. The configured provider hostname and HTTPS port are permitted. A
+different endpoint, such as an external object-storage service, must resolve
+only to public, non-reserved addresses.
 
 ### Private certificate authorities
 
@@ -351,22 +366,27 @@ The CA that signed the provider certificate must be trusted by the operating
 system and PHP environment used by Nextcloud.
 
 Do not disable TLS certificate verification.
-
 ## Nextcloud AIO
 
-Build Warden before copying it into the AIO container because the production
-Nextcloud container does not normally contain the Node.js build toolchain.
+Use the installable release archive instead of copying a development checkout
+or `node_modules` into the Nextcloud container.
 
 Example:
 
 ```bash
-cd nc_bitwarden
-npm ci
-npm run build
-
 docker cp \
-  . \
-  nextcloud-aio-nextcloud:/var/www/html/custom_apps/nc_bitwarden
+  nc_bitwarden-2.0.1.tar.gz \
+  nextcloud-aio-nextcloud:/tmp/
+
+docker exec \
+  --user root \
+  nextcloud-aio-nextcloud \
+  sh -c '
+    cd /var/www/html/custom_apps &&
+    rm -rf nc_bitwarden &&
+    tar -xzf /tmp/nc_bitwarden-2.0.1.tar.gz &&
+    chown -R www-data:www-data nc_bitwarden
+  '
 
 docker exec \
   --user www-data \
@@ -380,7 +400,6 @@ docker exec \
 ```
 
 Container names may differ between installations.
-
 ## Development
 
 Install dependencies:
@@ -432,6 +451,8 @@ Warden does not currently provide:
 - Passkey-based login to Warden
 - Passkey-based vault unlock
 - Guaranteed delayed clearing of the operating-system clipboard
+- Attachment uploads requiring an external or indirect upload flow
+- Private IP addresses and common private hostname suffixes for self-hosted providers
 
 Stored passkey credentials in vault entries are separate from using a passkey
 to authenticate to Warden.

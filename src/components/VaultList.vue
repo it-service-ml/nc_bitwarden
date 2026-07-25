@@ -24,7 +24,7 @@
         <div
           class="bw-vault__scope-switch"
           role="group"
-          aria-label="Suchbereich"
+          :aria-label="t('nc_bitwarden', 'Search scope')"
         >
           <button
             type="button"
@@ -33,8 +33,8 @@
               'bw-vault__scope-button--active':
                 searchScope === 'personal',
             }"
-            title="Persönlicher Tresor"
-            aria-label="Persönlicher Tresor"
+            :title="t('nc_bitwarden', 'Personal vault')"
+            :aria-label="t('nc_bitwarden', 'Personal vault')"
             :aria-pressed="searchScope === 'personal'"
             @click="searchScope = 'personal'"
           >
@@ -48,8 +48,8 @@
               'bw-vault__scope-button--active':
                 searchScope === 'organization',
             }"
-            title="Organisation"
-            aria-label="Organisation"
+            :title="t('nc_bitwarden', 'Organization')"
+            :aria-label="t('nc_bitwarden', 'Organization')"
             :aria-pressed="searchScope === 'organization'"
             @click="searchScope = 'organization'"
           >
@@ -63,8 +63,8 @@
               'bw-vault__scope-button--active':
                 searchScope === 'both',
             }"
-            title="Persönlich und Organisation"
-            aria-label="Persönlich und Organisation"
+            :title="t('nc_bitwarden', 'Personal and organization vaults')"
+            :aria-label="t('nc_bitwarden', 'Personal and organization vaults')"
             :aria-pressed="searchScope === 'both'"
             @click="searchScope = 'both'"
           >
@@ -1221,6 +1221,65 @@ function revisionTimestamp(item) {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
+function searchableItemText(item) {
+  const customFieldValues = (
+    item.fields
+    ?? []
+  ).flatMap(field => {
+    const values = [
+      field?.name,
+    ]
+
+    if (
+      Number(field?.type) === 0
+      || Number(field?.type) === 2
+    ) {
+      values.push(field?.value)
+    }
+
+    return values
+  })
+
+  const values = [
+    item.name,
+    item.notes,
+    item.login?.username,
+    ...(item.login?.uris ?? []).map(uri => uri?.uri),
+    item.card?.cardholderName,
+    item.card?.brand,
+    item.identity?.title,
+    item.identity?.firstName,
+    item.identity?.middleName,
+    item.identity?.lastName,
+    item.identity?.username,
+    item.identity?.company,
+    item.identity?.email,
+    item.identity?.phone,
+    item.identity?.address1,
+    item.identity?.address2,
+    item.identity?.address3,
+    item.identity?.city,
+    item.identity?.state,
+    item.identity?.postalCode,
+    item.identity?.country,
+    item.sshKey?.publicKey,
+    item.sshKey?.keyFingerprint,
+    ...(item.attachments ?? []).map(
+      attachment => attachment?.fileName,
+    ),
+    ...customFieldValues,
+  ]
+
+  return values
+    .filter(value =>
+      value !== null
+      && value !== undefined,
+    )
+    .map(value => String(value))
+    .join('\n')
+    .toLocaleLowerCase()
+}
+
 const filtered = computed(() => {
   let list = [...(props.items ?? [])]
 
@@ -1260,11 +1319,13 @@ const filtered = computed(() => {
     )
   }
 
-  const term = search.value.trim().toLocaleLowerCase('de')
+  const term = search.value
+    .trim()
+    .toLocaleLowerCase()
 
   if (term) {
     list = list.filter(item =>
-      (item.name ?? '').toLocaleLowerCase('de').includes(term),
+      searchableItemText(item).includes(term),
     )
   }
 

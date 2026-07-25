@@ -61,7 +61,7 @@
             }"
             @click="activeTab = 'assignment'"
           >
-            Zuordnung
+            {{ t('nc_bitwarden', 'Assignment') }}
           </button>
 
           <button
@@ -77,7 +77,7 @@
             }"
             @click="activeTab = 'content'"
           >
-            Inhalt
+            {{ t('nc_bitwarden', 'Content') }}
             <span v-if="form.fields.length">
               ({{ form.fields.length }})
             </span>
@@ -94,7 +94,7 @@
             }"
             @click="activeTab = 'security'"
           >
-            Sicherheit
+            {{ t('nc_bitwarden', 'Security') }}
             <span v-if="form.passkeys.length">
               ({{ form.passkeys.length }})
             </span>
@@ -110,7 +110,7 @@
             }"
             @click="activeTab = 'attachments'"
           >
-            Anhänge ({{ formAttachments.length }})
+            {{ t('nc_bitwarden', 'Attachments') }} ({{ formAttachments.length }})
           </button>
         </div>
       </div>
@@ -336,11 +336,133 @@
                 :preferences="generatorPreferences"
               />
             </div>
-            <NcTextField
-              v-model="form.uri"
-              :label="t('nc_bitwarden', 'URL')"
-              class="bw-form__field"
-            />
+            <div class="bw-form__full-width">
+              <label class="bw-form__label">
+                {{ t('nc_bitwarden', 'URLs') }}
+              </label>
+
+              <div class="bw-form__uri-list">
+                <div
+                  v-for="(loginUri, index) in form.uris"
+                  :key="`login-uri-${index}`"
+                  class="bw-form__uri-row"
+                >
+                  <NcTextField
+                    v-model="loginUri.uri"
+                    :label="
+                      t(
+                        'nc_bitwarden',
+                        'URL {number}',
+                        { number: index + 1 },
+                      )
+                    "
+                    class="bw-form__uri-input"
+                  />
+
+                  <button
+                    type="button"
+                    class="bw-form__uri-advanced"
+                    :aria-expanded="loginUri.advanced"
+                    @click="
+                      loginUri.advanced = !loginUri.advanced
+                    "
+                  >
+                    {{
+                      loginUri.advanced
+                        ? t(
+                          'nc_bitwarden',
+                          'Hide advanced settings',
+                        )
+                        : t(
+                          'nc_bitwarden',
+                          'Advanced',
+                        )
+                    }}
+                  </button>
+
+                  <div
+                    v-if="loginUri.advanced"
+                    class="bw-form__uri-match"
+                  >
+                    <label :for="`bw-uri-match-${index}`">
+                      {{
+                        t(
+                          'nc_bitwarden',
+                          'Match detection',
+                        )
+                      }}
+                    </label>
+
+                    <select
+                      :id="`bw-uri-match-${index}`"
+                      v-model="loginUri.match"
+                      class="bw-form__select"
+                    >
+                      <option :value="null">
+                        {{
+                          t(
+                            'nc_bitwarden',
+                            'Default match detection',
+                          )
+                        }}
+                      </option>
+                      <option :value="0">
+                        {{ t('nc_bitwarden', 'Base domain') }}
+                      </option>
+                      <option :value="1">
+                        {{ t('nc_bitwarden', 'Host') }}
+                      </option>
+                      <option :value="2">
+                        {{ t('nc_bitwarden', 'Starts with') }}
+                      </option>
+                      <option :value="3">
+                        {{ t('nc_bitwarden', 'Exact') }}
+                      </option>
+                      <option :value="4">
+                        {{
+                          t(
+                            'nc_bitwarden',
+                            'Regular expression',
+                          )
+                        }}
+                      </option>
+                      <option :value="5">
+                        {{ t('nc_bitwarden', 'Never') }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="bw-form__uri-remove"
+                    :title="
+                      t(
+                        'nc_bitwarden',
+                        'Remove URL {number}',
+                        { number: index + 1 },
+                      )
+                    "
+                    :aria-label="
+                      t(
+                        'nc_bitwarden',
+                        'Remove URL {number}',
+                        { number: index + 1 },
+                      )
+                    "
+                    @click="removeLoginUri(index)"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <NcButton
+                type="secondary"
+                @click="addLoginUri"
+              >
+                {{ t('nc_bitwarden', 'Add URL') }}
+              </NcButton>
+            </div>
             <NcTextField
               v-model="form.totp"
               :label="t('nc_bitwarden', 'TOTP (optional)')"
@@ -420,7 +542,7 @@
           <template v-if="Number(selectedType) === 1">
             <div class="bw-form__security-summary">
               <div class="bw-form__security-value">
-                <span>Passwortstärke</span>
+                <span>{{ t('nc_bitwarden', 'Password strength') }}</span>
                 <strong
                   :class="
                     `bw-form__strength--${currentPasswordStrength.id}`
@@ -431,14 +553,14 @@
               </div>
 
               <div class="bw-form__security-value">
-                <span>Passwortalter</span>
+                <span>{{ t('nc_bitwarden', 'Password age') }}</span>
                 <strong>{{ formPasswordAgeLabel }}</strong>
               </div>
             </div>
 
             <div class="bw-form__passkeys">
               <div class="bw-form__passkeys-title">
-                Gespeicherte Passkeys
+                {{ t('nc_bitwarden', 'Stored passkeys') }}
               </div>
 
               <article
@@ -457,7 +579,7 @@
                     {{
                       credential.rpName
                         || credential.rpId
-                        || 'Passkey'
+                        || t('nc_bitwarden', 'Passkey')
                     }}
                   </strong>
 
@@ -483,7 +605,7 @@
                   class="bw-form__passkey-remove"
                   @click="removePasskey(index)"
                 >
-                  Entfernen
+                  {{ t('nc_bitwarden', 'Remove') }}
                 </button>
               </article>
 
@@ -491,13 +613,16 @@
                 v-if="!form.passkeys.length"
                 class="bw-form__passkey-empty"
               >
-                In diesem Eintrag ist kein Passkey gespeichert.
+                {{ t('nc_bitwarden', 'No passkey is stored in this item.') }}
               </p>
 
               <p class="bw-form__passkey-hint">
-                Neue Website-Passkeys werden weiterhin über die
-                Bitwarden-Browsererweiterung erstellt. Das Entfernen
-                eines Passkeys wird erst mit „Speichern“ übernommen.
+                {{
+                  t(
+                    'nc_bitwarden',
+                    'New website passkeys must still be created with a compatible Bitwarden browser extension. Removing a stored passkey takes effect when the item is saved.',
+                  )
+                }}
               </p>
             </div>
           </template>
@@ -520,8 +645,12 @@
             v-else
             type="info"
           >
-            Den Eintrag zuerst speichern. Anschließend können
-            Anhänge hinzugefügt werden.
+            {{
+              t(
+                'nc_bitwarden',
+                'Save this item before adding attachments.',
+              )
+            }}
           </NcNoteCard>
         </section>
 
@@ -871,6 +1000,29 @@ function normalizeCustomField(field = {}) {
   }
 }
 
+function normalizeLoginUri(entry = {}) {
+  const rawMatch =
+    entry.match
+    ?? entry.Match
+    ?? null
+
+  const numericMatch = rawMatch === null || rawMatch === ''
+    ? null
+    : Number(rawMatch)
+
+  return {
+    uri: String(
+      entry.uri
+      ?? entry.Uri
+      ?? '',
+    ),
+    match: [0, 1, 2, 3, 4, 5].includes(numericMatch)
+      ? numericMatch
+      : null,
+    advanced: numericMatch !== null,
+  }
+}
+
 const initialOrganizationId =
   props.transferOrganizationId
   || props.item?.organizationId
@@ -899,7 +1051,11 @@ const form = reactive({
   favorite: Boolean(props.item?.favorite),
   username: props.item?.login?.username ?? '',
   password: props.item?.login?.password ?? '',
-  uri: props.item?.login?.uris?.[0]?.uri ?? '',
+  uris: (
+    props.item?.login?.uris?.length
+      ? props.item.login.uris
+      : [{}]
+  ).map(normalizeLoginUri),
   totp: props.item?.login?.totp ?? '',
   passkeys: (
     props.item?.login?.fido2Credentials
@@ -951,6 +1107,21 @@ function handleAttachmentsChanged(payload) {
   emit('attachments-changed', payload)
 }
 
+function addLoginUri() {
+  form.uris.push(
+    normalizeLoginUri(),
+  )
+}
+
+function removeLoginUri(index) {
+  if (form.uris.length <= 1) {
+    form.uris[0] = normalizeLoginUri()
+    return
+  }
+
+  form.uris.splice(index, 1)
+}
+
 const currentPasswordStrength = computed(() => {
   const password = String(form.password ?? '')
   let score = 0
@@ -999,14 +1170,20 @@ const currentPasswordStrength = computed(() => {
 
 const formPasswordAgeLabel = computed(() => {
   if (!isEdit.value) {
-    return 'Wird beim Speichern gesetzt'
+    return t(
+      'nc_bitwarden',
+      'Set when the item is saved',
+    )
   }
 
   if (
     String(form.password ?? '')
       !== String(props.item?.login?.password ?? '')
   ) {
-    return 'Wird beim Speichern aktualisiert'
+    return t(
+      'nc_bitwarden',
+      'Updated when the item is saved',
+    )
   }
 
   const revisionDate =
@@ -1070,6 +1247,12 @@ function serializedFormState() {
     form: {
       ...form,
       collectionIds: [...form.collectionIds],
+      uris: form.uris.map(loginUri => ({
+        uri: String(loginUri.uri ?? ''),
+        match: loginUri.match === null
+          ? null
+          : Number(loginUri.match),
+      })),
       fields: form.fields.map(field => ({
         localId: field.localId,
         type: Number(field.type),
@@ -1169,7 +1352,7 @@ const canSave = computed(() => {
   return Boolean(getEncryptionKey())
 })
 
-// Beim Besitzerwechsel keine Zuordnungen des alten Ziels behalten.
+// Clear assignments when the item owner changes.
 watch(
   () => form.organizationId,
   (nextOrganizationId, previousOrganizationId) => {
@@ -1257,12 +1440,6 @@ onBeforeUnmount(() => {
     'keydown',
     handleKeydown,
   )
-})
-
-watch(() => form.organizationId, (nextValue, previousValue) => {
-  if (normalizeId(nextValue) === normalizeId(previousValue)) return
-  form.collectionIds = []
-  collectionSearch.value = ''
 })
 
 watch(selectedType, () => {
@@ -1582,15 +1759,20 @@ async function buildPayload() {
         )
         : null,
 
-      uris: form.uri
-        ? [{
-          uri: await encrypt(
-            form.uri,
-            encryptionKey,
-          ),
-          match: null,
-        }]
-        : [],
+      uris: await Promise.all(
+        form.uris
+          .map(normalizeLoginUri)
+          .filter(loginUri =>
+            loginUri.uri.trim().length > 0,
+          )
+          .map(async loginUri => ({
+            uri: await encrypt(
+              loginUri.uri.trim(),
+              encryptionKey,
+            ),
+            match: loginUri.match,
+          })),
+      ),
 
       passwordRevisionDate,
       fido2Credentials:
@@ -2865,6 +3047,103 @@ async function save() {
 
   .bw-form__security-summary {
     grid-template-columns: 1fr;
+  }
+}
+
+.bw-form__uri-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.bw-form__uri-row {
+  display: grid;
+  grid-template-areas:
+    "url advanced remove"
+    "match match match";
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.bw-form__uri-input {
+  grid-area: url;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.bw-form__uri-match {
+  display: flex;
+  min-width: 0;
+  grid-area: match;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bw-form__uri-match label {
+  color: var(--color-text-maxcontrast);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bw-form__uri-advanced {
+  display: inline-flex;
+  min-height: 36px;
+  grid-area: advanced;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius);
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bw-form__uri-advanced:hover,
+.bw-form__uri-advanced:focus-visible {
+  background: var(--color-background-hover);
+}
+
+.bw-form__uri-remove {
+  display: inline-flex;
+  width: 36px;
+  grid-area: remove;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1px;
+  padding: 0;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius);
+  background: var(--color-main-background);
+  color: var(--color-error);
+  cursor: pointer;
+  font-size: 1.35rem;
+}
+
+.bw-form__uri-remove:hover,
+.bw-form__uri-remove:focus-visible {
+  background: var(--color-background-hover);
+}
+
+@media (max-width: 720px) {
+  .bw-form__uri-row {
+    grid-template-areas:
+      "url remove"
+      "advanced advanced"
+      "match match";
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bw-form__uri-advanced {
+    justify-self: start;
+  }
+
+  .bw-form__uri-remove {
+    justify-self: end;
   }
 }
 

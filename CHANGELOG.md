@@ -2,6 +2,48 @@
 
 All notable changes to Warden are documented in this file.
 
+## 2.0.1 - 2026-07-25
+
+Version 2.0.1 corrects functional, security and documentation issues found
+during the post-release review of 2.0.0.
+
+### Fixed
+
+- Login items now support creating, editing, preserving and deleting multiple
+  URLs without discarding all URLs after the first one
+- URL match detection settings are preserved and can be edited
+- URL match detection is hidden behind an advanced control by default
+- Search now covers common decrypted item metadata instead of only item names
+- Removed the obsolete server-side `clipboard_timeout` user preference
+- Replaced visible hard-coded German labels in the item form and search scope
+  with translatable strings
+- Corrected the AIO installation instructions so development dependencies are
+  not copied into the Nextcloud container
+
+### Security
+
+- Attachment download URLs must use HTTPS
+- External attachment download hosts are resolved and rejected when they
+  point to private or reserved addresses
+- Literal IP addresses, embedded credentials and private hostname suffixes are
+  rejected for attachment downloads
+- Redirects are disabled for server-side attachment file downloads
+- Search intentionally excludes passwords, TOTP secrets, SSH private keys and
+  hidden custom-field values
+- Documented the tab-scoped storage of decrypted user keys in
+  `sessionStorage`
+
+### Changed
+
+- Clarified that Warden SSO currently targets self-hosted Vaultwarden
+- Clarified the scope of SSO-only mode
+- Clarified attachment direct-upload limitations
+- Clarified self-hosted server URL restrictions
+- Clarified that passkey support covers display, preservation and removal of
+  stored credential metadata
+- Clarified that password strength is a basic indicator and password age can
+  be estimated for legacy entries
+
 ## 2.0.0 - 2026-07-25
 
 Version 2.0.0 is a major expansion of the original Nextcloud integration.
