@@ -1,12 +1,15 @@
 <?php
 
+
 namespace OCA\NcBitwarden\Controller;
 
 use OCA\NcBitwarden\Service\VaultwardenProxyService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\BruteForceProtection;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\IConfig;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
 
@@ -15,6 +18,7 @@ final class VaultwardenApiController extends Controller {
 		string $appName,
 		IRequest $request,
 		private VaultwardenProxyService $proxyService,
+		private IConfig $config,
 		private LoggerInterface $logger,
 		private string $userId,
 	) {
@@ -57,6 +61,24 @@ final class VaultwardenApiController extends Controller {
 	}
 
 	#[NoAdminRequired]
+	public function setPassword(): JSONResponse {
+		return $this->proxy(
+			'POST',
+			'/accounts/set-password',
+			$this->getJsonBody(),
+		);
+	}
+
+	#[NoAdminRequired]
+	public function changePassword(): JSONResponse {
+		return $this->proxy(
+			'POST',
+			'/accounts/password',
+			$this->getJsonBody(),
+		);
+	}
+
+	#[NoAdminRequired]
 	public function refresh(): JSONResponse {
 		try {
 			$this->proxyService->refreshToken($this->userId);
@@ -96,6 +118,15 @@ final class VaultwardenApiController extends Controller {
 	}
 
 	#[NoAdminRequired]
+	public function shareCipher(string $id): JSONResponse {
+		return $this->proxy(
+			'POST',
+			"/ciphers/$id/share",
+			$this->getJsonBody()
+		);
+	}
+
+	#[NoAdminRequired]
 	public function updateCipherCollections(string $id): JSONResponse {
 		return $this->proxy(
 			'POST',
@@ -114,8 +145,194 @@ final class VaultwardenApiController extends Controller {
 	}
 
 	#[NoAdminRequired]
+	public function updateCipherPartial(string $id): JSONResponse {
+		return $this->proxy(
+			'POST',
+			"/ciphers/$id/partial",
+			$this->getJsonBody(),
+		);
+	}
+
+	#[NoAdminRequired]
+	public function trashCipher(string $id): JSONResponse {
+		return $this->proxy(
+			'PUT',
+			"/ciphers/$id/delete",
+		);
+	}
+
+	#[NoAdminRequired]
+	public function restoreCipher(string $id): JSONResponse {
+		return $this->proxy(
+			'PUT',
+			"/ciphers/$id/restore",
+		);
+	}
+
+	#[NoAdminRequired]
 	public function deleteCipher(string $id): JSONResponse {
-		return $this->proxy('DELETE', "/ciphers/$id");
+		return $this->proxy(
+			'DELETE',
+			"/ciphers/$id",
+		);
+	}
+
+
+	#[NoAdminRequired]
+	public function createAttachment(string $id): JSONResponse {
+		$id = rawurlencode($id);
+
+		return $this->proxy(
+			'POST',
+			"/ciphers/$id/attachment/v2",
+			$this->getJsonBody(),
+		);
+	}
+
+	#[NoAdminRequired]
+	public function uploadAttachment(
+		string $id,
+		string $attachmentId,
+	): JSONResponse {
+		$id = rawurlencode($id);
+		$attachmentId = rawurlencode($attachmentId);
+		$path = "/ciphers/$id/attachment/$attachmentId";
+
+		try {
+			$uploaded = $this->request->getUploadedFile('data');
+
+			$attachmentMaxMb = (int)$this->config->getAppValue(
+				'nc_bitwarden',
+				'attachment_max_mb',
+				'25',
+			);
+
+			$attachmentMaxMb = max(
+				1,
+				min(1024, $attachmentMaxMb),
+			);
+
+			$attachmentUploadSize =
+				(int)($uploaded['size'] ?? 0);
+
+			if (
+				$attachmentUploadSize <= 0
+				&& !empty($uploaded['tmp_name'])
+				&& is_file((string)$uploaded['tmp_name'])
+			) {
+				$detectedSize = filesize(
+					(string)$uploaded['tmp_name'],
+				);
+
+				$attachmentUploadSize =
+					$detectedSize === false
+						? 0
+						: (int)$detectedSize;
+			}
+
+			/*
+			 * Das Backend erhält bereits verschlüsselte Daten.
+			 * Für IV, Padding und MAC wird 1 MiB technischer
+			 * Spielraum erlaubt. Das Klartextlimit wird im Browser
+			 * exakt geprüft.
+			 */
+			$attachmentUploadLimit =
+				(($attachmentMaxMb + 1) * 1024 * 1024);
+
+			if (
+				$attachmentUploadSize
+					> $attachmentUploadLimit
+			) {
+				return new JSONResponse(
+					[
+						'error' =>
+							'Der Anhang ist größer als '
+							. $attachmentMaxMb
+							. ' MiB.',
+					],
+					413,
+				);
+			}
+
+
+			if (
+				!is_array($uploaded)
+				|| (int)($uploaded['error'] ?? UPLOAD_ERR_NO_FILE)
+					!== UPLOAD_ERR_OK
+				|| empty($uploaded['tmp_name'])
+				|| !is_readable((string)$uploaded['tmp_name'])
+			) {
+				return new JSONResponse(
+					['error' => 'Es wurde keine gültige Datei übertragen.'],
+					400,
+				);
+			}
+
+			$result = $this->proxyService->uploadAttachment(
+				$this->userId,
+				$id,
+				$attachmentId,
+				(string)$uploaded['tmp_name'],
+				(string)($uploaded['name'] ?? 'data'),
+			);
+
+			return new JSONResponse($result);
+		} catch (\Exception $e) {
+			return $this->attachmentErrorResponse(
+				$e,
+				'POST',
+				$path,
+			);
+		}
+	}
+
+	#[NoAdminRequired]
+	public function downloadAttachment(
+		string $id,
+		string $attachmentId,
+	): DataDownloadResponse|JSONResponse {
+		$id = rawurlencode($id);
+		$attachmentId = rawurlencode($attachmentId);
+		$path = "/ciphers/$id/attachment/$attachmentId";
+
+		try {
+			$data = $this->proxyService->downloadAttachment(
+				$this->userId,
+				$id,
+				$attachmentId,
+			);
+
+			return new DataDownloadResponse(
+				$data,
+				'attachment.bin',
+				'application/octet-stream',
+				200,
+				[
+					'Cache-Control' => 'no-store, private',
+					'X-Content-Type-Options' => 'nosniff',
+				],
+			);
+		} catch (\Exception $e) {
+			return $this->attachmentErrorResponse(
+				$e,
+				'GET',
+				$path,
+			);
+		}
+	}
+
+	#[NoAdminRequired]
+	public function deleteAttachment(
+		string $id,
+		string $attachmentId,
+	): JSONResponse {
+		$id = rawurlencode($id);
+		$attachmentId = rawurlencode($attachmentId);
+
+		return $this->proxy(
+			'DELETE',
+			"/ciphers/$id/attachment/$attachmentId",
+		);
 	}
 
 	#[NoAdminRequired]
@@ -219,6 +436,41 @@ final class VaultwardenApiController extends Controller {
 		return $this->proxy(
 			'POST',
 			"/organizations/$organizationId/collections/$collectionId/delete"
+		);
+	}
+
+
+	private function attachmentErrorResponse(
+		\Exception $exception,
+		string $method,
+		string $path,
+	): JSONResponse {
+		$status = (int)$exception->getCode();
+
+		if ($status < 400 || $status > 599) {
+			$status = 502;
+		}
+
+		$message = $status < 500
+			? (
+				$exception->getMessage()
+				?: 'Anhangsanfrage fehlgeschlagen.'
+			)
+			: 'Anhangsanfrage fehlgeschlagen.';
+
+		$this->logger->error(
+			'nc_bitwarden: attachment proxy error',
+			[
+				'method' => $method,
+				'path' => $path,
+				'status' => $status,
+				'error' => $exception->getMessage(),
+			],
+		);
+
+		return new JSONResponse(
+			['error' => $message],
+			$status,
 		);
 	}
 

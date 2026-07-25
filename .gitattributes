@@ -1,0 +1,19 @@
+# Normalize text files
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Exclude development-only content from generated archives
+/.patch-backups export-ignore
+/node_modules export-ignore
+/vendor-bin export-ignore

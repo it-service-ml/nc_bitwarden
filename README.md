@@ -1,295 +1,477 @@
-# 🔐 Warden
+# Warden
 
-> Native Bitwarden & Vaultwarden integration for Nextcloud
+> Native Bitwarden and Vaultwarden integration for Nextcloud
 
+![Version](https://img.shields.io/badge/Version-2.0.0-blue)
 ![Nextcloud](https://img.shields.io/badge/Nextcloud-31--34-0082C9?logo=nextcloud&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green)
-![Security](https://img.shields.io/badge/E2E_Encrypted-✓-brightgreen)
 
-Access your Bitwarden or Vaultwarden vault directly from Nextcloud – no browser
-extension required. All decryption happens **client-side in the browser**.
-Your master password never leaves your device.
+Warden provides access to Bitwarden and Vaultwarden vaults directly inside
+Nextcloud.
 
----
+It supports classic master-password authentication, Vaultwarden TOTP login,
+OIDC single sign-on, personal and organization vaults, encrypted attachments,
+collections, folders, passkey-aware login entries, SSH keys, password
+generation, bulk operations and trash management.
 
-## ✨ Features
+Vault cryptography is performed in the browser. The master password and
+decrypted vault contents are not sent to Nextcloud.
 
-- 🔑 **Login entries** – username, password, TOTP, URLs
-- ⏱️ **Live TOTP codes** – current and next code with automatic refresh
-- 🎲 **Password generator** – configurable secure browser-side generation
-- ⭐ **Favourites view** – quick access to marked entries
-- 🗂️ **Collection management** – organisation collections and search
-- 📝 **Secure notes** – encrypted free-text notes
-- 💳 **Credit cards** – card number, CVV, expiry date
-- 🪪 **Identities** – address, phone, email, company
-- 📁 **Folder navigation** with entry count badges
-- 🔍 **Full-text search** across all vault items
-- ➕ **Create & edit** vault entries
-- 🏢 **Organisation vaults** (shared vaults via RSA-OAEP)
-- 🌍 **Bitwarden Cloud** (US & EU) + **self-hosted Vaultwarden**
-- ⚙️ **Administrator defaults** – centrally configure the provider for all users
-- 🔒 **Provider enforcement** – optionally prevent users from choosing another server
-- 🏷️ **Dynamic provider naming** – Bitwarden or Vaultwarden wording based on the provider
+Warden is an independent integration and is not an official Bitwarden client.
 
----
+## Supported providers
 
-## 🔒 Security Architecture
+Warden can connect to:
 
+- Bitwarden Cloud US at `bitwarden.com`
+- Bitwarden Cloud EU at `bitwarden.eu`
+- Self-hosted Vaultwarden instances
+- Compatible self-hosted Bitwarden instances
+
+Self-hosted servers must provide a valid HTTPS endpoint that is reachable from
+the Nextcloud server.
+
+## Features
+
+### Authentication
+
+- Classic email and master-password login
+- Vaultwarden TOTP two-step login
+- OIDC single sign-on where supported by the selected server
+- Optional SSO-only operation
+- First-login master-password setup for SSO accounts when required
+- Tab-scoped vault unlock
+- Provider configuration by administrators
+- Optional per-user provider overrides
+
+### Vault items
+
+Warden supports the following Bitwarden item types:
+
+- Login
+- Secure note
+- Card
+- Identity
+- SSH key
+
+Login entries support:
+
+- Username and password
+- Multiple URLs
+- TOTP secrets and live codes
+- Password history
+- Passkey credential information
+- Custom text, hidden, boolean and linked fields
+
+SSH keys can be displayed, edited and generated in the browser.
+
+### Personal and organization vaults
+
+- Personal vault items
+- Personal folders
+- Organization vaults
+- Organization collections
+- Collection creation, editing and deletion
+- Organization-key decryption using RSA-OAEP
+- Moving personal entries into organization collections
+- Client-side re-encryption during ownership transfers
+- Preservation of attachments, passkeys and custom fields during transfers
+
+### Attachments
+
+- Encrypted attachment upload
+- Encrypted attachment download
+- Attachment deletion
+- Configurable server-side attachment size limit
+- Client-side attachment encryption and decryption
+
+### Navigation and management
+
+- Three-column Nextcloud interface
+- Personal and organization navigation
+- Folder and collection counters
+- Full-text search
+- Favorites
+- TOTP category
+- SSH-key category
+- Trash view
+- Restore from trash
+- Permanent deletion
+- Drag-and-drop
+- Multiple selection
+- Bulk folder and collection operations
+- Bulk transfer from personal vaults to organizations
+- Inline note editing
+
+### Password tools
+
+- Browser-side password generator
+- Browser-side passphrase generator
+- Configurable length and character groups
+- German and English passphrase word lists
+- Password strength indication
+- Password age indication
+- Reused-password detection
+- HTTP URL warning
+- Storage of the five most recently replaced passwords
+
+### Preferences
+
+Administrators can configure:
+
+- Default provider
+- Self-hosted provider URL
+- Whether users may override the provider
+- Login and SSO behavior
+- Maximum attachment size
+- Organization notices and support information
+
+Users can configure, where permitted:
+
+- Provider selection
+- Initial navigation category
+- Navigation expansion behavior
+- Default target vault and collection
+- Default item type
+- Password-generator defaults
+- Passphrase-generator defaults
+
+## Security model
+
+Warden separates browser-side cryptography from the Nextcloud API proxy.
+
+```text
+Browser                         Nextcloud                     Provider
+   │                                │                            │
+   │  Authentication request        │                            │
+   ├───────────────────────────────▶│───────────────────────────▶│
+   │                                │                            │
+   │                                │◀──── Encrypted data ──────│
+   │◀──── Encrypted vault data ─────│                            │
+   │                                │                            │
+   │  Key derivation, verification, encryption and decryption   │
+   │  take place in the browser.                                │
+   │                                │                            │
+   │  Plaintext vault contents remain in the browser.           │
 ```
-Browser                          Nextcloud Server              Bitwarden / Vaultwarden
-   │                                   │                               │
-   │── Master Password ──▶ PBKDF2/     │                               │
-   │                        Argon2id   │                               │
-   │                          │        │                               │
-   │                          ▼        │                               │
-   │                     Master Key    │                               │
-   │                     (32 bytes)    │                               │
-   │                          │        │                               │
-   │                     HKDF-Expand   │                               │
-   │                    ┌─────┴─────┐  │                               │
-   │                  encKey     macKey│                               │
-   │                          │        │                               │
-   │── passwordHash ──────────┼───────▶│── POST /identity/connect ───▶ │
-   │   (PBKDF2, 1 iter.)      │        │          /token               │
-   │                          │        │◀── access_token + encKey ───  │
-   │                          │        │                               │
-   │◀──────── encKey (encrypted) ──────│                               │
-   │                          │        │                               │
-   │── AES-CBC decrypt ───────┘        │                               │
-   │   (HMAC-SHA256 verify)            │                               │
-   │                                   │                               │
-   │◀──── Vault items (encrypted) ─────│──── GET /api/sync ──────────▶ │
-   │                                   │                               │
-   │── AES-CBC decrypt (in browser) ──▶ Plaintext (never sent to server)
-```
 
-**Security guarantees:**
-- Master password is **never transmitted** to any server
-- Vault keys are held in **browser RAM only** (no LocalStorage)
-- Tokens stored in **PHP session only** (server-side, never in the browser)
-- All cryptographic operations via **Web Crypto API** (native browser code)
+The implementation includes:
 
----
+- PBKDF2 and Argon2id key derivation
+- HKDF key expansion
+- AES-CBC encryption and decryption
+- HMAC-SHA256 authentication
+- RSA-OAEP organization-key decryption
+- Client-side cipher re-encryption
+- Client-side attachment encryption and decryption
+- Provider access tokens stored in the server-side PHP session
 
-## 📋 Requirements
+The master password itself is not sent to the Nextcloud server. Classic login
+uses values derived from the master password as required by the Bitwarden
+protocol.
 
-| Component | Version |
+### Browser memory
+
+JavaScript strings and cryptographic values cannot be guaranteed to be
+securely erased from browser memory. This limitation applies to browser-based
+password managers in general.
+
+### Clipboard behavior
+
+Warden copies values only after a direct user action.
+
+Warden does not attempt to clear the system clipboard automatically after a
+delay. Browsers block delayed clipboard access when the Warden tab is no longer
+focused, which would make such a security option unreliable.
+
+Users should treat copied passwords, TOTP codes and private keys as sensitive
+clipboard data.
+
+### No offline cache
+
+Warden does not maintain a persistent offline copy of the decrypted vault.
+
+## Authentication modes
+
+### Classic login
+
+Classic login requires the account email address and master password.
+
+When TOTP is enabled on a Vaultwarden account, Warden requests the current
+authenticator code after the password has been verified.
+
+Other interactive two-step methods, such as WebAuthn or hardware security
+keys, are not currently handled by Warden's classic login form.
+
+### OIDC single sign-on
+
+For servers configured with OIDC SSO, Warden can start and complete the
+provider login directly from Nextcloud.
+
+SSO authenticates the user but does not bypass vault encryption. Depending on
+the provider and account state, a master password may still be required to
+unlock or initialize the encrypted vault.
+
+When the server reports that an SSO account does not yet have a master
+password, Warden can guide the user through the initial setup.
+
+An administrator may configure SSO-only operation to prevent use of the
+classic Warden login form.
+
+## Requirements
+
+| Component | Requirement |
 |---|---|
 | Nextcloud | 31, 32, 33 or 34 |
-| PHP | 8.1+ |
-| Node.js | 20+ |
-| npm | 8.3+ |
+| PHP | 8.1 or newer |
+| Browser | Current Chromium, Firefox or Safari with Web Crypto support |
+| HTTPS | Required for production operation |
+| Node.js | Required only when building from source |
+| npm | Required only when building from source |
 
----
+## Installation
 
-## 🚀 Installation
+### Install a release package
 
-### 1. Download the app
-
-```bash
-cd /var/www/html/apps   # or your Nextcloud apps directory
-git clone https://github.com/it-service-ml/nc_bitwarden.git
-```
-
-### 2. Build the JavaScript
+Extract the application into the Nextcloud application directory:
 
 ```bash
-cd nc_bitwarden
-npm install
-npm run build
+cd /var/www/html/custom_apps
+tar -xzf nc_bitwarden-2.0.0.tar.gz
+chown -R www-data:www-data nc_bitwarden
 ```
 
-### 3. Enable the app
+Enable the application:
 
 ```bash
 sudo -u www-data php /var/www/html/occ app:enable nc_bitwarden
 ```
 
-### 4. Configure
-
-#### Administrator configuration
-
-Nextcloud → **Administration settings → Warden**
-
-Administrators can define the default provider for all users:
-
-| Option | Description |
-|---|---|
-| Bitwarden Cloud (US) | Use `bitwarden.com` |
-| Bitwarden Cloud (EU) | Use `bitwarden.eu` |
-| Self-hosted Vaultwarden | Use a custom HTTPS server URL |
-| Allow user overrides | Permit users to select another provider |
-
-When user overrides are disabled, the administrator configuration is
-enforced for all users.
-
-#### Personal configuration
-
-Nextcloud → **Personal settings → Warden server**
-
-Users can choose their own provider only when this has been enabled by
-the administrator.
-
----
-
-## 🐳 Nextcloud AIO (Docker)
+### Install from source
 
 ```bash
-APP=/var/lib/docker/volumes/nextcloud_aio_nextcloud/_data/apps
+cd /var/www/html/custom_apps
 
-# Copy app
-cp -r nc_bitwarden $APP/
+git clone \
+  https://github.com/it-service-ml/nc_bitwarden.git
 
-# Build
-cd $APP/nc_bitwarden
-npm install && npm run build
+cd nc_bitwarden
 
-# Enable
-sudo docker exec --user www-data nextcloud-aio-nextcloud \
-  php /var/www/html/occ app:enable nc_bitwarden
+npm ci
+npm run build
+
+sudo -u www-data php /var/www/html/occ app:enable nc_bitwarden
 ```
 
----
+The generated `js/` and `css/` directories are required for operation.
 
-## 🏠 Self-hosted Bit- or Vaultwarden
+## Upgrade
 
-### URL format
-
-Enter only the base URL – **without** a trailing slash:
-
-```
-✅  https://vault.example.com
-❌  https://vault.example.com/
-❌  https://vault.example.com/api
-```
-
-### Bit- or Vaultwarden on the same network as Nextcloud
-
-If Bit- or Vaultwarden uses an internal hostname or IP, Nextcloud must be allowed to connect locally:
+Replace the application files with the new version and rebuild the frontend
+when installing from source:
 
 ```bash
-sudo docker exec --user www-data nextcloud-aio-nextcloud \
-  php /var/www/html/occ config:system:set \
-  allow_local_remote_servers --value=true --type=bool
-```
+cd /var/www/html/custom_apps/nc_bitwarden
 
-### Self-signed TLS certificate
-
-Add your CA certificate to Nextcloud's trust store:
-
-```bash
-cp my-ca.crt /var/www/html/resources/config/ca-bundle.crt
-```
-
----
-
-## 🔧 Development
-
-```bash
-# Development mode with auto-rebuild
-npm run dev
-
-# Linting
-npm run lint
-
-# Production build
+npm ci
 npm run build
 ```
 
-### Project structure
+Then run the Nextcloud upgrade process:
 
-```
-nc_bitwarden/
-├── appinfo/
-│   ├── info.xml          # App metadata, NC version range
-│   └── routes.php        # URL routing
-├── lib/
-│   ├── AppInfo/          # Bootstrap
-│   ├── Controller/       # PHP endpoints (API proxy, settings)
-│   ├── Service/          # Bitwarden proxy, user settings
-│   └── Settings/         # NC administrator and personal settings
-├── src/
-│   ├── services/
-│   │   ├── api.js        # Axios wrapper for NC backend
-│   │   └── crypto.js     # PBKDF2, Argon2id, AES-CBC, HKDF-Expand, RSA
-│   ├── components/
-│   │   ├── LoginForm.vue   # Master password entry
-│   │   ├── VaultList.vue   # Sidebar with folders & entries
-│   │   ├── ItemDetail.vue  # Entry detail view
-│   │   ├── ItemForm.vue    # Create / edit dialog
-│   │   ├── FieldRow.vue    # Reusable field row component
-│   │   ├── Settings.vue        # Personal server configuration
-│   │   └── AdminSettings.vue   # Administrator provider defaults
-│   └── App.vue            # Root component + vault loader
-└── templates/             # PHP templates for NC integration
+```bash
+sudo -u www-data php /var/www/html/occ upgrade
 ```
 
----
+Nextcloud stores the installed application version separately. Running
+`occ upgrade` is therefore required after changing the version in
+`appinfo/info.xml`.
 
-## 🛡️ Security Notes
+## Configuration
 
-### AES-CBC browser warning
+### Administrator settings
 
-The browser may show the following console message:
+Open:
 
-> *AES-CBC and AES-CTR do not provide authentication by default...*
+```text
+Nextcloud
+└── Administration settings
+    └── Warden
+```
 
-This is **not an error**. Bitwarden uses AES-CBC together with a separate HMAC-SHA256
-(Encrypt-then-MAC), which is cryptographically sound. The warning is a generic browser
-recommendation; this app deliberately follows the Bitwarden wire protocol for full
-compatibility.
+Select one of the supported providers:
 
-### Known limitations
+- Bitwarden Cloud US
+- Bitwarden Cloud EU
+- Self-hosted Vaultwarden or Bitwarden
 
-- **Memory dump**: JavaScript strings are immutable – the master password cannot be
-  securely wiped from the heap after use. This applies to all browser-based password
-  managers and is an accepted trade-off.
-- **Organisation vaults**: Require RSA-OAEP decryption of the user's private key
-  (fully implemented). For very large vaults this may take a few seconds on first load.
+For a self-hosted provider, enter only the base URL:
 
----
+```text
+https://vault.example.com
+```
 
-## 🗺️ Roadmap
+Do not add `/api`, `/identity` or another API path.
 
-- [x] Live TOTP code display (auto-refresh)
-- [x] Password generator
-- [x] Favourites view
-- [x] Administrator provider defaults and policy enforcement
-- [ ] WebAuthn/FIDO2 two-step login, including YubiKey
-- [ ] Passkey login and vault unlock
-- [ ] SSO login for supported Bitwarden and Vaultwarden servers
-- [ ] Offline cache (Service Worker)
-- [ ] Bitwarden Send support
+The administrator can enforce this provider for all users or allow individual
+provider overrides.
 
----
+### Personal settings
 
-## 🤝 Contributing
+When provider overrides are permitted, users can select their own provider
+under:
 
-Pull requests are welcome! Please:
+```text
+Nextcloud
+└── Personal settings
+    └── Warden server
+```
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Commit your changes (`git commit -m 'Add: my feature'`)
-4. Push the branch (`git push origin feature/my-feature`)
-5. Open a Pull Request
+Additional vault and generator preferences are available from the settings
+dialog inside Warden.
 
----
+## Internal and self-hosted servers
 
-## 📄 License
+When the provider uses an internal address, Nextcloud may need permission to
+contact local remote servers:
 
-[AGPL-3.0](LICENSE) – the same license as Nextcloud itself.
+```bash
+sudo -u www-data php /var/www/html/occ \
+  config:system:set allow_local_remote_servers \
+  --value=true \
+  --type=bool
+```
 
----
+Only enable this option when local provider URLs are intentionally required.
 
-## 🙏 Credits
+### Private certificate authorities
+
+The CA that signed the provider certificate must be trusted by the operating
+system and PHP environment used by Nextcloud.
+
+Do not disable TLS certificate verification.
+
+## Nextcloud AIO
+
+Build Warden before copying it into the AIO container because the production
+Nextcloud container does not normally contain the Node.js build toolchain.
+
+Example:
+
+```bash
+cd nc_bitwarden
+npm ci
+npm run build
+
+docker cp \
+  . \
+  nextcloud-aio-nextcloud:/var/www/html/custom_apps/nc_bitwarden
+
+docker exec \
+  --user www-data \
+  nextcloud-aio-nextcloud \
+  php /var/www/html/occ app:enable nc_bitwarden
+
+docker exec \
+  --user www-data \
+  nextcloud-aio-nextcloud \
+  php /var/www/html/occ upgrade
+```
+
+Container names may differ between installations.
+
+## Development
+
+Install dependencies:
+
+```bash
+npm ci
+```
+
+Start the watch build:
+
+```bash
+npm run dev
+```
+
+Run ESLint:
+
+```bash
+npm run lint
+```
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+### Main directories
+
+```text
+appinfo/       Nextcloud metadata and routes
+lib/           PHP controllers, services and settings
+src/           Vue components and browser-side services
+templates/     Nextcloud PHP templates
+l10n/          Application translations
+js/            Generated JavaScript
+css/           Generated stylesheets
+```
+
+Do not edit generated files in `js/` or `css/` directly.
+
+## Current limitations
+
+Warden does not currently provide:
+
+- Browser autofill
+- Bitwarden Send
+- Persistent offline vault access
+- WebAuthn or hardware-key handling in the classic two-step login form
+- Passkey-based login to Warden
+- Passkey-based vault unlock
+- Guaranteed delayed clearing of the operating-system clipboard
+
+Stored passkey credentials in vault entries are separate from using a passkey
+to authenticate to Warden.
+
+## Release checks
+
+Before publishing a release:
+
+```bash
+npm run lint
+npm run build
+
+find appinfo lib \
+  -type f \
+  -name '*.php' \
+  -print0 \
+  | xargs -0 -n1 php -l
+```
+
+The application version must match in:
+
+- `appinfo/info.xml`
+- `package.json`
+- `package-lock.json`
+
+## License
+
+Warden is licensed under the
+[GNU Affero General Public License v3.0](LICENSE).
+
+## Credits
 
 Warden is maintained by **Christian Thiele / Mission Leben IT**.
 
-The original application was created by **Philipp Tannich**. It has since
-been substantially extended and modernised by Mission Leben IT.
+The original Nextcloud application was created by **Philipp Tannich** and was
+subsequently extended and modernized by Mission Leben IT.
 
-- [Bitwarden](https://bitwarden.com) – open-source password manager
-- [Vaultwarden](https://github.com/dani-garcia/vaultwarden) – unofficial Bitwarden-compatible server
-- [Nextcloud](https://nextcloud.com) – self-hosted cloud platform
-- [@noble/hashes](https://github.com/paulmillr/noble-hashes) – pure-JS Argon2id implementation
+Related projects:
+
+- [Bitwarden](https://bitwarden.com)
+- [Vaultwarden](https://github.com/dani-garcia/vaultwarden)
+- [Nextcloud](https://nextcloud.com)
+- [@noble/hashes](https://github.com/paulmillr/noble-hashes)

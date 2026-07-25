@@ -4,6 +4,8 @@
     :class="{
       'bw-field-card--wide': wide,
       'bw-field-card--secret': secret,
+      'bw-field-card--compact': compact,
+      'bw-field-card--collapsible': collapsible,
     }"
   >
     <header class="bw-field-card__header">
@@ -51,11 +53,22 @@
           v-if="copyable && hasValue"
           type="button"
           class="bw-field-card__action"
+          :class="{
+            'bw-field-card__action--copied': copied,
+          }"
           :title="t('nc_bitwarden', 'Copy to clipboard')"
           :aria-label="t('nc_bitwarden', 'Copy to clipboard')"
           @click="copyValue"
         >
-          <ContentCopyIcon :size="18" />
+          <span
+            v-if="copied"
+            class="bw-field-card__check"
+            aria-hidden="true"
+          >✓</span>
+          <ContentCopyIcon
+            v-else
+            :size="18"
+          />
         </button>
       </div>
     </header>
@@ -81,6 +94,26 @@
       </span>
     </div>
 
+    <button
+      v-if="hasCollapsibleContent"
+      type="button"
+      class="bw-field-card__toggle"
+      :aria-expanded="expanded"
+      @click="expanded = !expanded"
+    >
+      {{ expanded
+        ? t('nc_bitwarden', 'Hide full URL')
+        : t('nc_bitwarden', 'Show full URL')
+      }}
+    </button>
+
+    <p
+      v-if="hint"
+      class="bw-field-card__hint"
+    >
+      {{ hint }}
+    </p>
+
     <p
       v-if="message"
       class="bw-field-card__message"
@@ -99,6 +132,7 @@ import {
   watch,
 } from 'vue'
 import { t } from '@nextcloud/l10n'
+import { copySensitiveText } from '../services/clipboard.js'
 import EyeOutlineIcon from 'vue-material-design-icons/EyeOutline.vue'
 import EyeOffOutlineIcon from 'vue-material-design-icons/EyeOffOutline.vue'
 import ContentCopyIcon from 'vue-material-design-icons/ContentCopy.vue'
@@ -132,9 +166,23 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  hint: {
+    type: String,
+    default: '',
+  },
+  compact: {
+    type: Boolean,
+    default: false,
+  },
+  collapsible: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const revealed = ref(false)
+const copied = ref(false)
+const expanded = ref(false)
 const message = ref('')
 
 let messageTimer = null
@@ -148,18 +196,6 @@ const rawValue = computed(() =>
 const hasValue = computed(() =>
   rawValue.value.trim().length > 0,
 )
-
-const displayValue = computed(() => {
-  if (!hasValue.value) {
-    return t('nc_bitwarden', 'Not provided')
-  }
-
-  if (props.secret && !revealed.value) {
-    return '••••••••••••'
-  }
-
-  return rawValue.value
-})
 
 const normalizedHref = computed(() => {
   const value = String(
@@ -177,6 +213,55 @@ const normalizedHref = computed(() => {
   return `https://${value}`
 })
 
+const hasCollapsibleContent = computed(() =>
+  props.collapsible
+  && Boolean(normalizedHref.value)
+  && rawValue.value.length > 80,
+)
+
+const collapsedValue = computed(() => {
+  try {
+    const url = new URL(
+      normalizedHref.value,
+    )
+
+    const path = url.pathname === '/'
+      ? ''
+      : url.pathname
+
+    const preview = (
+      `${url.hostname}${path}`
+    )
+
+    return preview.length > 72
+      ? `${preview.slice(0, 72)}…`
+      : preview
+  } catch {
+    return rawValue.value.length > 72
+      ? `${rawValue.value.slice(0, 72)}…`
+      : rawValue.value
+  }
+})
+
+const displayValue = computed(() => {
+  if (!hasValue.value) {
+    return t('nc_bitwarden', 'Not provided')
+  }
+
+  if (props.secret && !revealed.value) {
+    return '••••••••••••'
+  }
+
+  if (
+    hasCollapsibleContent.value
+    && !expanded.value
+  ) {
+    return collapsedValue.value
+  }
+
+  return rawValue.value
+})
+
 function clearMessageTimer() {
   if (messageTimer) {
     clearTimeout(messageTimer)
@@ -190,32 +275,17 @@ function showMessage(value) {
   message.value = value
 
   messageTimer = setTimeout(() => {
+    copied.value = false
     message.value = ''
     messageTimer = null
-  }, 2200)
+  }, 1600)
 }
 
 async function writeClipboard(value) {
   try {
-    await navigator.clipboard.writeText(value)
-    return true
+    return await copySensitiveText(value)
   } catch {
-    const textarea = document.createElement('textarea')
-
-    textarea.value = value
-    textarea.setAttribute('readonly', '')
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    textarea.style.pointerEvents = 'none'
-
-    document.body.appendChild(textarea)
-    textarea.select()
-
-    const copied = document.execCommand('copy')
-
-    textarea.remove()
-
-    return copied
+    return false
   }
 }
 
@@ -224,15 +294,13 @@ async function copyValue() {
     return
   }
 
-  const copied = await writeClipboard(rawValue.value)
+  const copySucceeded = await writeClipboard(rawValue.value)
+
+  copied.value = copySucceeded
 
   showMessage(
-    copied
-      ? t(
-        'nc_bitwarden',
-        '{label} was copied.',
-        { label: props.label },
-      )
+    copySucceeded
+      ? ''
       : t(
         'nc_bitwarden',
         '{label} could not be copied.',
@@ -245,6 +313,8 @@ watch(
   () => props.value,
   () => {
     revealed.value = false
+    copied.value = false
+    expanded.value = false
     message.value = ''
     clearMessageTimer()
   },
@@ -269,6 +339,11 @@ onBeforeUnmount(() => {
 
 .bw-field-card--wide {
   grid-column: 1 / -1;
+}
+
+.bw-field-card--compact {
+  gap: 0.3rem;
+  padding: 0.65rem 0.75rem;
 }
 
 .bw-field-card__header {
@@ -309,6 +384,15 @@ onBeforeUnmount(() => {
   text-decoration: none;
 }
 
+.bw-field-card__action--copied {
+  color: var(--color-success);
+}
+
+.bw-field-card__check {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
 .bw-field-card__action:hover,
 .bw-field-card__action:focus-visible {
   border-color: var(--color-border);
@@ -347,9 +431,33 @@ onBeforeUnmount(() => {
   font-weight: normal;
 }
 
+.bw-field-card__toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-element);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.bw-field-card__toggle:hover,
+.bw-field-card__toggle:focus-visible {
+  text-decoration: underline;
+}
+
+.bw-field-card__hint,
 .bw-field-card__message {
   margin: 0;
   color: var(--color-text-maxcontrast);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
+
+.bw-field-card__hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 </style>

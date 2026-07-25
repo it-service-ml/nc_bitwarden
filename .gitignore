@@ -11,3 +11,18 @@
 /vendor/
 /vendor-bin/*/vendor/
 /.php-cs-fixer.cache
+
+# Local development backups
+.patch-backups/
+*.bak-*
+*.orig
+*.rej
+*.tmp
+*.temp
+*.swp
+*~
+.DS_Store
+*.log
+
+# Local development patch scripts
+varden_sso_patch*.py

@@ -1,5 +1,6 @@
 <?php
 
+
 namespace OCA\NcBitwarden\Service;
 
 use OCP\Http\Client\IClientService;
@@ -128,9 +129,6 @@ final class VaultwardenProxyService {
 				$data['error_description'] ?? $data['error'] ?? 'Login fehlgeschlagen'
 			);
 		}
-		if (session_status() === PHP_SESSION_ACTIVE) {
-			session_regenerate_id(true);
-		}
 		$this->session->set(self::SESSION_TOKEN_KEY, $data['access_token']);
 		$this->session->set(self::SESSION_EXPIRY_KEY, time() + ($data['expires_in'] ?? 3600));
 		if (!empty($data['refresh_token'])) {
@@ -222,6 +220,257 @@ final class VaultwardenProxyService {
 		return $responseBody !== ''
 			? (json_decode($responseBody, true) ?? [])
 			: [];
+	}
+
+
+	/**
+	 * Lädt bereits im Browser verschlüsselte Anhangsdaten hoch.
+	 */
+	public function uploadAttachment(
+		string $userId,
+		string $cipherId,
+		string $attachmentId,
+		string $temporaryPath,
+		string $encryptedFileName,
+	): array {
+		$this->ensureValidToken($userId);
+
+		$urls = $this->settingsService->getApiUrls($userId);
+		$token = $this->session->get(self::SESSION_TOKEN_KEY);
+		$client = $this->httpClientService->newClient();
+		$handle = fopen($temporaryPath, 'rb');
+
+		if ($handle === false) {
+			throw new \RuntimeException(
+				'Die verschlüsselte Upload-Datei konnte nicht geöffnet werden.',
+			);
+		}
+
+		$options = array_merge(
+			$this->baseOptions,
+			[
+				'timeout' => 300,
+				'connect_timeout' => 20,
+				'headers' => $this->clientHeaders([
+					'Authorization' => 'Bearer ' . $token,
+				]),
+				'multipart' => [
+					[
+						'name' => 'data',
+						'contents' => $handle,
+						'filename' => $encryptedFileName ?: 'data',
+						'headers' => [
+							'Content-Type'
+								=> 'application/octet-stream',
+						],
+					],
+				],
+			],
+		);
+
+		try {
+			$response = $client->post(
+				$urls['api']
+				. "/ciphers/$cipherId"
+				. "/attachment/$attachmentId",
+				$options,
+			);
+		} catch (\Exception $e) {
+			throw $this->wrappedApiException($e);
+		} finally {
+			if (is_resource($handle)) {
+				fclose($handle);
+			}
+		}
+
+		$responseBody = $this->responseBodyToString(
+			$response->getBody(),
+		);
+
+		return $responseBody !== ''
+			? (json_decode($responseBody, true) ?? [])
+			: [];
+	}
+
+	/**
+	 * Lädt ausschließlich die verschlüsselten Binärdaten herunter.
+	 */
+	public function downloadAttachment(
+		string $userId,
+		string $cipherId,
+		string $attachmentId,
+	): string {
+		$this->ensureValidToken($userId);
+
+		$urls = $this->settingsService->getApiUrls($userId);
+		$token = $this->session->get(self::SESSION_TOKEN_KEY);
+		$client = $this->httpClientService->newClient();
+
+		/*
+		 * Vaultwardens Attachment-Endpoint liefert zunächst
+		 * Metadaten als JSON. Darin steht die URL zur wirklich
+		 * verschlüsselten Binärdatei.
+		 */
+		$metadataOptions = array_merge(
+			$this->baseOptions,
+			[
+				'timeout' => 60,
+				'connect_timeout' => 20,
+				'headers' => $this->clientHeaders([
+					'Authorization' => 'Bearer ' . $token,
+					'Accept' => 'application/json',
+				]),
+			],
+		);
+
+		$metadataUrl = $urls['api']
+			. "/ciphers/$cipherId"
+			. "/attachment/$attachmentId";
+
+		try {
+			$metadataResponse = $client->get(
+				$metadataUrl,
+				$metadataOptions,
+			);
+		} catch (\Exception $e) {
+			throw $this->wrappedApiException($e);
+		}
+
+		$metadataBody = $this->responseBodyToString(
+			$metadataResponse->getBody(),
+		);
+
+		$metadata = json_decode(
+			$metadataBody,
+			true,
+		);
+
+		$downloadUrl = is_array($metadata)
+			? (
+				$metadata['url']
+				?? $metadata['Url']
+				?? null
+			)
+			: null;
+
+		if (
+			!is_string($downloadUrl)
+			|| trim($downloadUrl) === ''
+		) {
+			throw new \RuntimeException(
+				'Vaultwarden hat keine Download-URL '
+					. 'für den Anhang zurückgegeben.',
+				502,
+			);
+		}
+
+		$downloadUrl = trim($downloadUrl);
+
+		/*
+		 * Aktuelle Vaultwarden-Versionen liefern normalerweise
+		 * eine absolute URL. Relative URLs werden vorsorglich
+		 * gegen den API-Host aufgelöst.
+		 */
+		if (str_starts_with($downloadUrl, '/')) {
+			$apiParts = parse_url($urls['api']);
+
+			$scheme = $apiParts['scheme'] ?? null;
+			$host = $apiParts['host'] ?? null;
+			$port = isset($apiParts['port'])
+				? ':' . $apiParts['port']
+				: '';
+
+			if (!$scheme || !$host) {
+				throw new \RuntimeException(
+					'Die Vaultwarden-API-Adresse '
+						. 'ist ungültig.',
+					502,
+				);
+			}
+
+			$downloadUrl =
+				$scheme
+				. '://'
+				. $host
+				. $port
+				. $downloadUrl;
+		}
+
+		$downloadScheme = strtolower(
+			(string)parse_url(
+				$downloadUrl,
+				PHP_URL_SCHEME,
+			),
+		);
+
+		if (
+			!in_array(
+				$downloadScheme,
+				['http', 'https'],
+				true,
+			)
+		) {
+			throw new \RuntimeException(
+				'Vaultwarden hat eine ungültige '
+					. 'Download-URL zurückgegeben.',
+				502,
+			);
+		}
+
+		/*
+		 * Für diese URL keine Authorization mitsenden:
+		 *
+		 * - lokales Vaultwarden nutzt einen Download-Token
+		 *   in der URL;
+		 * - externe Objektspeicher nutzen eine signierte URL.
+		 */
+		$downloadOptions = array_merge(
+			$this->baseOptions,
+			[
+				'timeout' => 300,
+				'connect_timeout' => 20,
+				'allow_redirects' => true,
+			],
+		);
+
+		try {
+			$fileResponse = $client->get(
+				$downloadUrl,
+				$downloadOptions,
+			);
+		} catch (\Exception $e) {
+			throw $this->wrappedApiException($e);
+		}
+
+		return $this->responseBodyToString(
+			$fileResponse->getBody(),
+		);
+	}
+
+	private function wrappedApiException(
+		\Exception $exception,
+	): \RuntimeException {
+		$status = 502;
+
+		if (
+			method_exists($exception, 'getResponse')
+			&& ($response = $exception->getResponse()) !== null
+		) {
+			$upstreamStatus = (int)$response->getStatusCode();
+
+			if (
+				$upstreamStatus >= 400
+				&& $upstreamStatus <= 599
+			) {
+				$status = $upstreamStatus;
+			}
+		}
+
+		return new \RuntimeException(
+			$this->extractErrorMessage($exception),
+			$status,
+			$exception,
+		);
 	}
 
 	private function ensureValidToken(string $userId): void {

@@ -1,4 +1,5 @@
 /**
+ *
  * Bitwarden Crypto – Client-Side Vault Decryption
  * PBKDF2 / Argon2id · AES-256-CBC · HMAC-SHA256 · RSA-OAEP (Org-Keys)
  */
@@ -117,7 +118,7 @@ export async function decryptEncStringRaw(encStr, encKeyBuffer, macKeyBuffer) {
   return crypto.subtle.decrypt({ name: 'AES-CBC', iv: parsed.iv }, decKey, parsed.ct)
 }
 
-/** FIX 1: decryptEncString gibt '' zurück wenn encStr leer/null – kein Crash */
+/** decryptEncString gibt '' zurück wenn encStr leer/null – kein Crash */
 export async function decryptEncString(encStr, encKeyBuffer, macKeyBuffer) {
   if (!encStr) return ''
   const raw = await decryptEncStringRaw(encStr, encKeyBuffer, macKeyBuffer)
@@ -136,7 +137,7 @@ export async function decryptUserSymmetricKey(encKeyString, masterKeyBuffer) {
 // ─── RSA: Organisation-Key Decryption ─────────────────────────────────────────
 
 /**
- * FIX 3a: RSA Private Key entschlüsseln
+ * RSA Private Key entschlüsseln
  * Profile.PrivateKey = AES-CBC-256-HMAC (Typ 2) verschlüsselt mit User Symmetric Key
  */
 export async function decryptRsaPrivateKey(encPrivateKeyStr, userKey) {
@@ -153,7 +154,7 @@ export async function decryptRsaPrivateKey(encPrivateKeyStr, userKey) {
 }
 
 /**
- * FIX 3b: Organisations-Keys entschlüsseln
+ * Organisations-Keys entschlüsseln
  * org.Key = RSA-OAEP (Typ 4 oder 6) verschlüsselt mit User RSA Public Key
  * Ergebnis: Map { orgId → { encKey, macKey } }
  */
@@ -175,11 +176,10 @@ export async function decryptOrgKeys(organizations = [], rsaPrivateKey) {
 
 // ─── Encryption ───────────────────────────────────────────────────────────────
 
-export async function encryptString(plaintext, encKeyBuffer, macKeyBuffer) {
-  if (!plaintext) return null
+export async function encryptBuffer(buffer, encKeyBuffer, macKeyBuffer) {
   const iv = crypto.getRandomValues(new Uint8Array(16))
   const encKey = await crypto.subtle.importKey('raw', encKeyBuffer, { name: 'AES-CBC' }, false, ['encrypt'])
-  const ct = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, encKey, encoder.encode(plaintext))
+  const ct = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, encKey, buffer)
   const combined = new Uint8Array(iv.byteLength + ct.byteLength)
   combined.set(iv)
   combined.set(new Uint8Array(ct), iv.byteLength)
@@ -188,11 +188,283 @@ export async function encryptString(plaintext, encKeyBuffer, macKeyBuffer) {
   return `2.${bufferToB64(iv.buffer)}|${bufferToB64(ct)}|${bufferToB64(mac)}`
 }
 
+export async function encryptString(plaintext, encKeyBuffer, macKeyBuffer) {
+  if (!plaintext) return null
+  return encryptBuffer(encoder.encode(plaintext).buffer, encKeyBuffer, macKeyBuffer)
+}
+
+/** Erstellt den zufälligen 512-Bit-Benutzerschlüssel eines neuen Tresors. */
+export function generateUserSymmetricKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(64))
+  return {
+    encKey: bytes.slice(0, 32).buffer,
+    macKey: bytes.slice(32, 64).buffer,
+  }
+}
+
+/**
+ * Wandelt einen zweigeteilten Bitwarden-Schlüssel in 64 Rohbytes um.
+ */
+export function symmetricKeyToBuffer(key) {
+  if (!key?.encKey || !key?.macKey) {
+    throw new Error(
+      'Ungültiger symmetrischer Schlüssel.',
+    )
+  }
+
+  const raw = new Uint8Array(64)
+
+  raw.set(new Uint8Array(key.encKey), 0)
+  raw.set(new Uint8Array(key.macKey), 32)
+
+  return raw.buffer
+}
+
+/**
+ * Verschlüsselt einen 64-Byte-Anhangsschlüssel mit dem
+ * Benutzer- oder Organisationsschlüssel des Eintrags.
+ */
+export async function encryptSymmetricKey(
+  key,
+  wrappingKey,
+) {
+  return encryptBuffer(
+    symmetricKeyToBuffer(key),
+    wrappingKey.encKey,
+    wrappingKey.macKey,
+  )
+}
+
+/**
+ * Entschlüsselt einen gespeicherten Anhangsschlüssel.
+ */
+export async function decryptSymmetricKey(
+  encryptedKey,
+  wrappingKey,
+) {
+  const raw = new Uint8Array(
+    await decryptEncStringRaw(
+      encryptedKey,
+      wrappingKey.encKey,
+      wrappingKey.macKey,
+    ),
+  )
+
+  if (raw.byteLength !== 64) {
+    throw new Error(
+      `Ungültige Schlüssellänge: ${raw.byteLength}`,
+    )
+  }
+
+  return {
+    encKey: raw.slice(0, 32).buffer,
+    macKey: raw.slice(32, 64).buffer,
+  }
+}
+
+/**
+ * Bitwarden EncArrayBuffer:
+ *
+ * Byte 0      : Verschlüsselungstyp 2
+ * Byte 1–16   : IV
+ * Byte 17–48  : HMAC-SHA256
+ * ab Byte 49  : AES-CBC-Ciphertext
+ */
+export async function encryptFileData(
+  plaintext,
+  key,
+) {
+  const input = plaintext instanceof ArrayBuffer
+    ? plaintext
+    : plaintext.buffer.slice(
+      plaintext.byteOffset,
+      plaintext.byteOffset + plaintext.byteLength,
+    )
+
+  const iv = crypto.getRandomValues(
+    new Uint8Array(16),
+  )
+
+  const encryptionKey = await crypto.subtle.importKey(
+    'raw',
+    key.encKey,
+    { name: 'AES-CBC' },
+    false,
+    ['encrypt'],
+  )
+
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: 'AES-CBC',
+      iv,
+    },
+    encryptionKey,
+    input,
+  )
+
+  const authenticatedData = new Uint8Array(
+    iv.byteLength + ciphertext.byteLength,
+  )
+
+  authenticatedData.set(iv, 0)
+  authenticatedData.set(
+    new Uint8Array(ciphertext),
+    iv.byteLength,
+  )
+
+  const macKey = await crypto.subtle.importKey(
+    'raw',
+    key.macKey,
+    {
+      name: 'HMAC',
+      hash: 'SHA-256',
+    },
+    false,
+    ['sign'],
+  )
+
+  const mac = await crypto.subtle.sign(
+    'HMAC',
+    macKey,
+    authenticatedData,
+  )
+
+  const output = new Uint8Array(
+    1
+      + iv.byteLength
+      + mac.byteLength
+      + ciphertext.byteLength,
+  )
+
+  output[0] = 2
+  output.set(iv, 1)
+  output.set(new Uint8Array(mac), 17)
+  output.set(new Uint8Array(ciphertext), 49)
+
+  return output.buffer
+}
+
+/**
+ * Entschlüsselt ein Bitwarden-EncArrayBuffer vollständig im Browser.
+ */
+export async function decryptFileData(
+  encrypted,
+  key,
+) {
+  const bytes = encrypted instanceof Uint8Array
+    ? encrypted
+    : new Uint8Array(encrypted)
+
+  if (bytes.byteLength < 65) {
+    throw new Error(
+      'Die verschlüsselte Datei ist zu kurz.',
+    )
+  }
+
+  if (bytes[0] !== 2) {
+    throw new Error(
+      `Nicht unterstützter Dateiverschlüsselungstyp: ${bytes[0]}`,
+    )
+  }
+
+  const iv = bytes.slice(1, 17)
+  const mac = bytes.slice(17, 49)
+  const ciphertext = bytes.slice(49)
+
+  const authenticatedData = new Uint8Array(
+    iv.byteLength + ciphertext.byteLength,
+  )
+
+  authenticatedData.set(iv, 0)
+  authenticatedData.set(
+    ciphertext,
+    iv.byteLength,
+  )
+
+  const macKey = await crypto.subtle.importKey(
+    'raw',
+    key.macKey,
+    {
+      name: 'HMAC',
+      hash: 'SHA-256',
+    },
+    false,
+    ['verify'],
+  )
+
+  const valid = await crypto.subtle.verify(
+    'HMAC',
+    macKey,
+    mac,
+    authenticatedData,
+  )
+
+  if (!valid) {
+    throw new Error(
+      'Die Integritätsprüfung des Anhangs ist fehlgeschlagen.',
+    )
+  }
+
+  const decryptionKey = await crypto.subtle.importKey(
+    'raw',
+    key.encKey,
+    { name: 'AES-CBC' },
+    false,
+    ['decrypt'],
+  )
+
+  return crypto.subtle.decrypt(
+    {
+      name: 'AES-CBC',
+      iv,
+    },
+    decryptionKey,
+    ciphertext,
+  )
+}
+
+/** Verschlüsselt den Benutzerschlüssel mit dem gestreckten Master-Key. */
+export async function encryptUserSymmetricKey(userKey, masterKeyBuffer) {
+  const raw = new Uint8Array(64)
+  raw.set(new Uint8Array(userKey.encKey), 0)
+  raw.set(new Uint8Array(userKey.macKey), 32)
+  const stretched = await stretchMasterKey(masterKeyBuffer)
+  return encryptBuffer(raw.buffer, stretched.encKey, stretched.macKey)
+}
+
+/** Erstellt das RSA-OAEP-Schlüsselpaar für Organisations-Tresore. */
+export async function generateEncryptedRsaKeyPair(userKey) {
+  const keyPair = await crypto.subtle.generateKey(
+    {
+      name: 'RSA-OAEP',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-1',
+    },
+    true,
+    ['encrypt', 'decrypt'],
+  )
+
+  const [publicKey, privateKey] = await Promise.all([
+    crypto.subtle.exportKey('spki', keyPair.publicKey),
+    crypto.subtle.exportKey('pkcs8', keyPair.privateKey),
+  ])
+
+  return {
+    publicKey: bufferToB64(publicKey),
+    encryptedPrivateKey: await encryptBuffer(
+      privateKey,
+      userKey.encKey,
+      userKey.macKey,
+    ),
+  }
+}
+
 // ─── Vault Item Decryption ────────────────────────────────────────────────────
 
 /**
- * FIX 1+3: dec() fängt Fehler ab und gibt '' zurück statt zu crashen.
- * FIX 3:   Org-Ciphers nutzen orgKey statt userKey.
+ * dec() fängt Fehler ab und gibt '' zurück statt zu crashen.
+ * Org-Ciphers nutzen orgKey statt userKey.
  *
  * @param {Object} cipher  – Cipher-Objekt aus Bitwarden Sync
  * @param {Object} userKey – { encKey, macKey } des eingeloggten Benutzers
@@ -204,7 +476,7 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
     ? orgKeys[cipher.OrganizationId]
     : userKey
 
-  // FIX 1: Fehler je Feld abfangen – ein fehlendes Feld killt nicht den ganzen Eintrag
+  // Fehler je Feld abfangen – ein fehlendes Feld killt nicht den ganzen Eintrag
   const dec = async (s) => {
     if (!s) return ''
     try {
@@ -226,19 +498,207 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
     name: await dec(cipher.Name),
     notes: await dec(cipher.Notes),
     revisionDate: cipher.RevisionDate,
+    passwordRevisionDate:
+      cipher.PasswordRevisionDate ?? null,
+    creationDate: cipher.CreationDate ?? null,
+
+    deletedDate:
+      cipher.DeletedDate
+      ?? cipher.deletedDate
+      ?? null,
+
     organizationId: cipher.OrganizationId ?? null,
   }
+
+  const rawPasswordHistory = Array.isArray(
+    cipher.PasswordHistory,
+  )
+    ? cipher.PasswordHistory
+    : (
+      Array.isArray(cipher.passwordHistory)
+        ? cipher.passwordHistory
+        : []
+    )
+
+  base.passwordHistory = (
+    await Promise.all(
+      rawPasswordHistory.map(async entry => ({
+        password: await dec(
+          entry.Password
+          ?? entry.password
+          ?? '',
+        ),
+        lastUsedDate:
+          entry.LastUsedDate
+          ?? entry.lastUsedDate
+          ?? null,
+      })),
+    )
+  ).filter(entry => entry.password)
+
+  const rawAttachments = Array.isArray(cipher.Attachments)
+    ? cipher.Attachments
+    : []
+
+  base.attachments = await Promise.all(
+    rawAttachments.map(async attachment => {
+      const attachmentId =
+        attachment.Id
+        ?? attachment.id
+        ?? ''
+
+      const encryptedFileName =
+        attachment.FileName
+        ?? attachment.fileName
+        ?? ''
+
+      const encryptedKey =
+        attachment.Key
+        ?? attachment.key
+        ?? ''
+
+      const fileName = await dec(encryptedFileName)
+
+      try {
+        const attachmentKey = encryptedKey
+          ? await decryptSymmetricKey(
+            encryptedKey,
+            key,
+          )
+          : key
+
+        return {
+          id: attachmentId,
+          fileName:
+            fileName
+            || 'Unbenannter Anhang',
+          encryptedFileName,
+          encryptedKey,
+          key: attachmentKey,
+          size: Number(
+            attachment.Size
+            ?? attachment.size
+            ?? 0,
+          ),
+          sizeName:
+            attachment.SizeName
+            ?? attachment.sizeName
+            ?? '',
+          unavailable: false,
+        }
+      } catch (exception) {
+        console.warn(
+          '[nc_bitwarden] Anhangsschlüssel konnte '
+            + 'nicht entschlüsselt werden:',
+          exception,
+        )
+
+        return {
+          id: attachmentId,
+          fileName:
+            fileName
+            || 'Nicht entschlüsselbarer Anhang',
+          encryptedFileName,
+          encryptedKey,
+          key: null,
+          size: Number(
+            attachment.Size
+            ?? attachment.size
+            ?? 0,
+          ),
+          sizeName:
+            attachment.SizeName
+            ?? attachment.sizeName
+            ?? '',
+          unavailable: true,
+          error: exception?.message ?? '',
+        }
+      }
+    }),
+  )
 
   switch (cipher.Type) {
     case 1: {
       const login = cipher.Login ?? {}
+      const decryptCredentialValue = async value => {
+        if (value === null || value === undefined) {
+          return ''
+        }
+
+        if (typeof value !== 'string') {
+          return String(value)
+        }
+
+        return /^[0-6]\./.test(value)
+          ? dec(value)
+          : value
+      }
+
+      const rawCredentials =
+        login.Fido2Credentials
+        ?? login.Fido2credentials
+        ?? []
+
       base.login = {
         username: await dec(login.Username),
         password: await dec(login.Password),
         totp: await dec(login.Totp),
-        uris: await Promise.all((login.Uris ?? []).map(async u => ({
-          uri: await dec(u.Uri), match: u.Match,
-        }))),
+        uris: await Promise.all(
+          (login.Uris ?? []).map(async uri => ({
+            uri: await dec(uri.Uri),
+            match: uri.Match,
+          })),
+        ),
+        passwordRevisionDate:
+          login.PasswordRevisionDate
+          ?? cipher.PasswordRevisionDate
+          ?? null,
+        fido2Credentials: await Promise.all(
+          rawCredentials.map(async credential => ({
+            credentialId: await decryptCredentialValue(
+              credential.CredentialId,
+            ),
+            keyType: await decryptCredentialValue(
+              credential.KeyType,
+            ),
+            keyAlgorithm: await decryptCredentialValue(
+              credential.KeyAlgorithm,
+            ),
+            keyCurve: await decryptCredentialValue(
+              credential.KeyCurve,
+            ),
+            keyValue: await decryptCredentialValue(
+              credential.KeyValue,
+            ),
+            rpId: await decryptCredentialValue(
+              credential.RpId,
+            ),
+            rpName: await decryptCredentialValue(
+              credential.RpName,
+            ),
+            userHandle: await decryptCredentialValue(
+              credential.UserHandle,
+            ),
+            userName: await decryptCredentialValue(
+              credential.UserName,
+            ),
+            userDisplayName:
+              await decryptCredentialValue(
+                credential.UserDisplayName,
+              ),
+            counter: await decryptCredentialValue(
+              credential.Counter,
+            ),
+            discoverable:
+              await decryptCredentialValue(
+                credential.Discoverable,
+              ),
+            creationDate:
+              credential.CreationDate
+              ?? credential.creationDate
+              ?? null,
+          })),
+        ),
       }
       break
     }
@@ -258,12 +718,39 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
     case 4: {
       const id = cipher.Identity ?? {}
       base.identity = {
+        title: await dec(id.Title),
         firstName: await dec(id.FirstName),
+        middleName: await dec(id.MiddleName),
         lastName: await dec(id.LastName),
+        username: await dec(id.Username),
+        company: await dec(id.Company),
         email: await dec(id.Email),
         phone: await dec(id.Phone),
         address1: await dec(id.Address1),
-        company: await dec(id.Company),
+        address2: await dec(id.Address2),
+        address3: await dec(id.Address3),
+        city: await dec(id.City),
+        state: await dec(id.State),
+        postalCode: await dec(id.PostalCode),
+        country: await dec(id.Country),
+        ssn: await dec(id.Ssn),
+        passportNumber: await dec(id.PassportNumber),
+        licenseNumber: await dec(id.LicenseNumber),
+      }
+      break
+    }
+    case 5: {
+      const sshKey = cipher.SshKey ?? cipher.SSHKey ?? {}
+      base.sshKey = {
+        privateKey: await dec(
+          sshKey.PrivateKey ?? sshKey.privateKey,
+        ),
+        publicKey: await dec(
+          sshKey.PublicKey ?? sshKey.publicKey,
+        ),
+        keyFingerprint: await dec(
+          sshKey.KeyFingerprint ?? sshKey.keyFingerprint,
+        ),
       }
       break
     }
@@ -274,6 +761,7 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
       type: f.Type,
       name: await dec(f.Name),
       value: await dec(f.Value),
+      linkedId: f.LinkedId ?? null,
     })))
   }
 

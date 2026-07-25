@@ -1,8 +1,80 @@
 <template>
   <div class="bw-vault">
-    <!-- Suchleiste -->
+    <!-- Hauptsuche mit Tresorbereich und Löschknopf -->
     <div class="bw-vault__search">
-      <NcTextField v-model="search" :label="t('nc_bitwarden', 'Search…')" />
+      <div class="bw-vault__main-search">
+        <input
+          v-model="search"
+          type="text"
+          :placeholder="t('nc_bitwarden', 'Search…')"
+          autocomplete="off"
+        >
+
+        <button
+          v-if="search"
+          type="button"
+          class="bw-vault__search-clear"
+          :title="t('nc_bitwarden', 'Clear search')"
+          :aria-label="t('nc_bitwarden', 'Clear search')"
+          @click="search = ''"
+        >
+          <CloseIcon :size="17" />
+        </button>
+
+        <div
+          class="bw-vault__scope-switch"
+          role="group"
+          aria-label="Suchbereich"
+        >
+          <button
+            type="button"
+            class="bw-vault__scope-button"
+            :class="{
+              'bw-vault__scope-button--active':
+                searchScope === 'personal',
+            }"
+            title="Persönlicher Tresor"
+            aria-label="Persönlicher Tresor"
+            :aria-pressed="searchScope === 'personal'"
+            @click="searchScope = 'personal'"
+          >
+            <AccountOutlineIcon :size="18" />
+          </button>
+
+          <button
+            type="button"
+            class="bw-vault__scope-button"
+            :class="{
+              'bw-vault__scope-button--active':
+                searchScope === 'organization',
+            }"
+            title="Organisation"
+            aria-label="Organisation"
+            :aria-pressed="searchScope === 'organization'"
+            @click="searchScope = 'organization'"
+          >
+            <DomainIcon :size="18" />
+          </button>
+
+          <button
+            type="button"
+            class="bw-vault__scope-button"
+            :class="{
+              'bw-vault__scope-button--active':
+                searchScope === 'both',
+            }"
+            title="Persönlich und Organisation"
+            aria-label="Persönlich und Organisation"
+            :aria-pressed="searchScope === 'both'"
+            @click="searchScope = 'both'"
+          >
+            <span class="bw-vault__scope-both">
+              <AccountOutlineIcon :size="14" />
+              <DomainIcon :size="14" />
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Sortierung -->
@@ -32,12 +104,32 @@
     <div class="bw-vault__navigation">
       <!-- Kategorien -->
       <div class="bw-vault__folders">
-        <div class="bw-vault__section-title">
-          {{ t('nc_bitwarden', 'Categories') }}
+        <div class="bw-vault__section-heading">
+          <button
+            type="button"
+            class="bw-vault__section-toggle"
+            :aria-expanded="!collapsedSections.categories"
+            @click="toggleSection('categories')"
+          >
+            <ChevronRightIcon
+              v-if="collapsedSections.categories"
+              :size="17"
+            />
+
+            <ChevronDownIcon
+              v-else
+              :size="17"
+            />
+
+            <span class="bw-vault__section-title">
+              {{ t('nc_bitwarden', 'Categories') }}
+            </span>
+          </button>
         </div>
 
         <button
           v-for="category in categories"
+          v-show="!collapsedSections.categories"
           :key="category.id"
           class="bw-folder"
           :class="{ 'bw-folder--active':
@@ -60,9 +152,26 @@
       <!-- Ordner -->
       <div class="bw-vault__folders">
         <div class="bw-vault__section-heading">
-          <div class="bw-vault__section-title">
-            {{ t('nc_bitwarden', 'Folders') }}
-          </div>
+          <button
+            type="button"
+            class="bw-vault__section-toggle"
+            :aria-expanded="!collapsedSections.folders"
+            @click="toggleSection('folders')"
+          >
+            <ChevronRightIcon
+              v-if="collapsedSections.folders"
+              :size="17"
+            />
+
+            <ChevronDownIcon
+              v-else
+              :size="17"
+            />
+
+            <span class="bw-vault__section-title">
+              {{ t('nc_bitwarden', 'Folders') }}
+            </span>
+          </button>
 
           <button
             type="button"
@@ -75,16 +184,30 @@
               'nc_bitwarden',
               'Create new personal folder',
             )"
-            @click="$emit('create-folder')"
+            @click.stop="$emit('create-folder')"
           >
             <PlusIcon :size="18" />
           </button>
         </div>
 
         <button
+          v-show="!collapsedSections.folders"
           class="bw-folder"
-          :class="{ 'bw-folder--active': selectedFolder === '__none__' }"
+          :class="{
+            'bw-folder--active': selectedFolder === '__none__',
+            'bw-drop-target--active':
+              dropTargetKey === 'folder:__none__',
+          }"
           @click="selectFolder('__none__')"
+          @dragenter="
+            activateFolderDropTarget(
+              $event,
+              'folder:__none__',
+            )
+          "
+          @dragover="allowFolderDrop"
+          @dragleave="clearDropTarget"
+          @drop="dropOnFolder($event, null)"
         >
           <FolderOutlineIcon :size="17" class="bw-folder__icon" />
           {{ t('nc_bitwarden', 'No personal folder') }}
@@ -93,12 +216,25 @@
 
         <div
           v-for="folder in sortedFolders"
+          v-show="!collapsedSections.folders"
           :key="folder.id"
           class="bw-folder-row"
           :class="{
             'bw-folder-row--active':
               selectedFolder === normalizeId(folder.id),
+            'bw-drop-target--active':
+              dropTargetKey
+              === `folder:${normalizeId(folder.id)}`,
           }"
+          @dragenter="
+            activateFolderDropTarget(
+              $event,
+              `folder:${normalizeId(folder.id)}`,
+            )
+          "
+          @dragover="allowFolderDrop"
+          @dragleave="clearDropTarget"
+          @drop="dropOnFolder($event, folder.id)"
         >
           <button
             type="button"
@@ -112,10 +248,6 @@
 
             <span class="bw-folder__name">
               {{ folder.name }}
-            </span>
-
-            <span class="bw-folder__count">
-              {{ folderCount(folder.id) }}
             </span>
           </button>
 
@@ -156,17 +288,84 @@
               <DeleteOutlineIcon :size="16" />
             </button>
           </div>
+
+          <span
+            class="
+              bw-folder__count
+              bw-folder-row__count
+            "
+          >
+            {{ folderCount(folder.id) }}
+          </span>
         </div>
       </div>
 
       <!-- Organisation-Sammlungen -->
-      <div
-        v-if="collectionRows.length > 0 || canCreateCollection"
-        class="bw-vault__folders"
-      >
+      <div class="bw-vault__folders">
         <div class="bw-vault__section-heading">
-          <div class="bw-vault__section-title">
-            {{ t('nc_bitwarden', 'Collections') }}
+          <div class="bw-vault__section-heading-main">
+            <button
+              type="button"
+              class="bw-vault__section-toggle"
+              :aria-expanded="!collapsedSections.collections"
+              @click="toggleSection('collections')"
+            >
+              <ChevronRightIcon
+                v-if="collapsedSections.collections"
+                :size="17"
+              />
+
+              <ChevronDownIcon
+                v-else
+                :size="17"
+              />
+
+              <span class="bw-vault__section-title">
+                {{ t('nc_bitwarden', 'Collections') }}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="bw-vault__tree-action"
+              :disabled="allCollectionRows.length === 0"
+              :title="
+                t(
+                  'nc_bitwarden',
+                  'Collapse all collections',
+                )
+              "
+              :aria-label="
+                t(
+                  'nc_bitwarden',
+                  'Collapse all collections',
+                )
+              "
+              @click.stop="collapseAllCollections"
+            >
+              <ChevronRightIcon :size="16" />
+            </button>
+
+            <button
+              type="button"
+              class="bw-vault__tree-action"
+              :disabled="allCollectionRows.length === 0"
+              :title="
+                t(
+                  'nc_bitwarden',
+                  'Expand all collections',
+                )
+              "
+              :aria-label="
+                t(
+                  'nc_bitwarden',
+                  'Expand all collections',
+                )
+              "
+              @click.stop="expandAllCollections"
+            >
+              <ChevronDownIcon :size="16" />
+            </button>
           </div>
 
           <button
@@ -175,14 +374,17 @@
             class="bw-vault__section-action"
             :title="t('nc_bitwarden', 'Create new collection')"
             :aria-label="t('nc_bitwarden', 'Create new collection')"
-            @click="$emit('create-collection')"
+            @click.stop="$emit('create-collection')"
           >
             <PlusIcon :size="18" />
           </button>
         </div>
 
         <div
-          v-if="allCollectionRows.length > 0"
+          v-if="
+            !collapsedSections.collections
+              && allCollectionRows.length > 0
+          "
           class="bw-collection-search"
         >
           <MagnifyIcon :size="17" />
@@ -206,7 +408,10 @@
         </div>
 
         <div
-          v-if="collectionSearch"
+          v-if="
+            !collapsedSections.collections
+              && collectionSearch
+          "
           class="bw-collection-search__summary"
         >
           {{ t(
@@ -218,12 +423,27 @@
 
         <div
           v-for="collection in collectionRows"
+          v-show="!collapsedSections.collections"
           :key="collection.id"
           class="bw-folder-row"
           :class="{
             'bw-folder-row--active':
               selectedCollection === normalizeId(collection.id),
+            'bw-drop-target--active':
+              dropTargetKey
+              === `collection:${normalizeId(collection.id)}`,
           }"
+          @dragenter="
+            activateCollectionDropTarget(
+              $event,
+              collection,
+            )
+          "
+          @dragover="
+            allowCollectionDrop($event, collection)
+          "
+          @dragleave="clearDropTarget"
+          @drop="dropOnCollection($event, collection)"
         >
           <button
             type="button"
@@ -266,10 +486,6 @@
               :title="collection.path"
             >
               {{ collection.label }}
-            </span>
-
-            <span class="bw-folder__count">
-              {{ collectionCount(collection.id) }}
             </span>
           </button>
 
@@ -315,6 +531,15 @@
               <DeleteOutlineIcon :size="16" />
             </button>
           </div>
+
+          <span
+            class="
+              bw-folder__count
+              bw-folder-row__count
+            "
+          >
+            {{ collectionCount(collection.id) }}
+          </span>
         </div>
       </div>
     </div>
@@ -326,6 +551,13 @@
           <KeyOutlineIcon :size="16" />
         </template>
         {{ t('nc_bitwarden', 'Generate password') }}
+      </NcButton>
+
+      <NcButton @click="$emit('settings')">
+        <template #icon>
+          <CogOutlineIcon :size="16" />
+        </template>
+        {{ t('nc_bitwarden', 'Settings') }}
       </NcButton>
 
       <NcButton @click="$emit('logout')">
@@ -342,7 +574,6 @@
 import { ref, computed, watch } from 'vue'
 import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
-import NcTextField from '@nextcloud/vue/components/NcTextField'
 import ViewListOutlineIcon from 'vue-material-design-icons/ViewListOutline.vue'
 import StarOutlineIcon from 'vue-material-design-icons/StarOutline.vue'
 import KeyOutlineIcon from 'vue-material-design-icons/KeyOutline.vue'
@@ -357,7 +588,10 @@ import PencilOutlineIcon from 'vue-material-design-icons/PencilOutline.vue'
 import DeleteOutlineIcon from 'vue-material-design-icons/DeleteOutline.vue'
 import MagnifyIcon from 'vue-material-design-icons/Magnify.vue'
 import CloseIcon from 'vue-material-design-icons/Close.vue'
+import AccountOutlineIcon from 'vue-material-design-icons/AccountOutline.vue'
+import DomainIcon from 'vue-material-design-icons/Domain.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
+import CogOutlineIcon from 'vue-material-design-icons/CogOutline.vue'
 import LogoutIcon from 'vue-material-design-icons/Logout.vue'
 import {
   collectionMatchesQuery,
@@ -365,15 +599,39 @@ import {
 } from '../utils/collectionSearch.js'
 
 const props = defineProps({
-  items: Array,
-  folders: Array,
-  collections: Array,
-  organizations: Array,
-  selectedId: String,
+  items: {
+    type: Array,
+    default: () => [],
+  },
+  folders: {
+    type: Array,
+    default: () => [],
+  },
+  collections: {
+    type: Array,
+    default: () => [],
+  },
+  organizations: {
+    type: Array,
+    default: () => [],
+  },
+  selectedId: {
+    type: String,
+    default: null,
+  },
+  startCategory: {
+    type: String,
+    default: 'all',
+  },
+  navigationStartMode: {
+    type: String,
+    default: 'personal_expanded',
+  },
 })
 const emit = defineEmits([
   'logout',
   'generate-password',
+  'settings',
   'filter-change',
   'navigate',
   'create-folder',
@@ -382,15 +640,60 @@ const emit = defineEmits([
   'create-collection',
   'edit-collection',
   'delete-collection',
+  'drop-folder',
+  'drop-collection',
 ])
 
+const START_CATEGORIES = new Set([
+  'all',
+  'favorites',
+  'logins',
+  'totp',
+  'ssh-keys',
+  'notes',
+  'cards',
+  'identities',
+
+  'trash',
+])
+
+const NAVIGATION_MODES = new Set([
+  'collapsed',
+  'personal_expanded',
+  'expanded',
+])
+
+function initialCategory() {
+  return START_CATEGORIES.has(props.startCategory)
+    ? props.startCategory
+    : 'all'
+}
+
+function initialNavigationMode() {
+  return NAVIGATION_MODES.has(
+    props.navigationStartMode,
+  )
+    ? props.navigationStartMode
+    : 'personal_expanded'
+}
+
 const search = ref('')
+const searchScope = ref('both')
 const selectedFolder = ref(null)
 const selectedCollection = ref(null)
-const selectedCategory = ref('all')
+const selectedCategory = ref(initialCategory())
 const sortMode = ref('name-asc')
 const collapsedCollectionPaths = ref(new Set())
 const collectionSearch = ref('')
+const navigationInitialized = ref(false)
+const dropTargetKey = ref('')
+
+const collapsedSections = ref({
+  categories: initialNavigationMode() === 'collapsed',
+  folders: initialNavigationMode() === 'collapsed',
+  collections:
+    initialNavigationMode() !== 'expanded',
+})
 
 const categories = [
   {
@@ -414,6 +717,11 @@ const categories = [
     icon: KeyOutlineIcon,
   },
   {
+    id: 'ssh-keys',
+    label: t('nc_bitwarden', 'SSH keys'),
+    icon: KeyOutlineIcon,
+  },
+  {
     id: 'notes',
     label: t('nc_bitwarden', 'Secure notes'),
     icon: NoteTextOutlineIcon,
@@ -427,6 +735,12 @@ const categories = [
     id: 'identities',
     label: t('nc_bitwarden', 'Identities'),
     icon: IdentityOutlineIcon,
+  },
+
+  {
+    id: 'trash',
+    label: t('nc_bitwarden', 'Trash'),
+    icon: DeleteOutlineIcon,
   },
 ]
 
@@ -581,6 +895,175 @@ const collectionRows = computed(() => {
   })
 })
 
+function draggedItemIds(event) {
+  const customData = event.dataTransfer?.getData(
+    'application/x-warden-item-ids',
+  )
+
+  if (customData) {
+    try {
+      const parsed = JSON.parse(customData)
+
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(value => String(value ?? '').trim())
+          .filter(Boolean)
+      }
+    } catch {
+      // Fall back to text/plain below.
+    }
+  }
+
+  return String(
+    event.dataTransfer?.getData('text/plain') ?? '',
+  )
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean)
+}
+
+function draggedItems(event) {
+  const ids = new Set(
+    draggedItemIds(event)
+      .map(normalizeId)
+      .filter(Boolean),
+  )
+
+  if (!ids.size) {
+    return []
+  }
+
+  return (props.items ?? []).filter(item =>
+    ids.has(normalizeId(item.id)),
+  )
+}
+
+function canDropOnFolder(event) {
+  const dragged = draggedItems(event)
+
+  return (
+    dragged.length > 0
+    && dragged.every(item =>
+      normalizeId(item.organizationId) === null,
+    )
+  )
+}
+
+function canDropOnCollection(event, collection) {
+  /*
+   * Während dragenter/dragover darf der Drag-Payload noch
+   * nicht ausgewertet werden. Chrome liefert getData() dort
+   * teilweise leer zurück und würde dadurch das Ziel sperren.
+   *
+   * IDs und Besitzer werden erst beim tatsächlichen Drop
+   * geprüft.
+   */
+  return normalizeId(
+    collection?.organizationId,
+  ) !== null
+}
+
+function rejectDrop(event) {
+  dropTargetKey.value = ''
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'none'
+  }
+}
+
+function allowDrop(event) {
+  event.preventDefault()
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function activateFolderDropTarget(event, key) {
+  if (!canDropOnFolder(event)) {
+    rejectDrop(event)
+    return
+  }
+
+  allowDrop(event)
+  dropTargetKey.value = key
+}
+
+function allowFolderDrop(event) {
+  if (!canDropOnFolder(event)) {
+    rejectDrop(event)
+    return
+  }
+
+  allowDrop(event)
+}
+
+function activateCollectionDropTarget(event, collection) {
+  if (!canDropOnCollection(event, collection)) {
+    rejectDrop(event)
+    return
+  }
+
+  allowDrop(event)
+  dropTargetKey.value =
+    `collection:${normalizeId(collection.id)}`
+}
+
+function allowCollectionDrop(event, collection) {
+  if (!canDropOnCollection(event, collection)) {
+    rejectDrop(event)
+    return
+  }
+
+  allowDrop(event)
+}
+
+function clearDropTarget(event) {
+  if (
+    !event.currentTarget.contains(
+      event.relatedTarget,
+    )
+  ) {
+    dropTargetKey.value = ''
+  }
+}
+
+function dropOnFolder(event, folderId) {
+  const itemIds = draggedItemIds(event)
+  const valid = canDropOnFolder(event)
+
+  dropTargetKey.value = ''
+
+  if (!valid || !itemIds.length) {
+    return
+  }
+
+  event.preventDefault()
+
+  emit('drop-folder', {
+    itemIds,
+    folderId: folderId || null,
+  })
+}
+
+function dropOnCollection(event, collection) {
+  const itemIds = draggedItemIds(event)
+  const valid = canDropOnCollection(event, collection)
+
+  dropTargetKey.value = ''
+
+  if (!valid || !itemIds.length) {
+    return
+  }
+
+  event.preventDefault()
+
+  emit('drop-collection', {
+    itemIds,
+    collection,
+  })
+}
+
 function selectCategory(categoryId) {
   selectedCategory.value = categoryId
   selectedFolder.value = null
@@ -611,6 +1094,25 @@ function selectCollection(collectionId) {
   emitCurrentFilter()
 }
 
+function toggleSection(section) {
+  collapsedSections.value = {
+    ...collapsedSections.value,
+    [section]: !collapsedSections.value[section],
+  }
+}
+
+function collapseAllCollections() {
+  collapsedCollectionPaths.value = new Set(
+    allCollectionRows.value
+      .filter(collection => collection.hasChildren)
+      .map(collection => collection.nodeKey),
+  )
+}
+
+function expandAllCollections() {
+  collapsedCollectionPaths.value = new Set()
+}
+
 function toggleCollection(collection) {
   if (!collection.hasChildren) {
     selectCollection(collection.id)
@@ -632,7 +1134,24 @@ function isCollectionCollapsed(collection) {
   return collapsedCollectionPaths.value.has(collection.nodeKey)
 }
 
+function isDeletedItem(item) {
+  return Boolean(
+    item?.deletedDate
+    ?? item?.DeletedDate,
+  )
+}
+
 function categoryMatches(item, categoryId) {
+  const deleted = isDeletedItem(item)
+
+  if (categoryId === 'trash') {
+    return deleted
+  }
+
+  if (deleted) {
+    return false
+  }
+
   switch (categoryId) {
     case 'favorites':
       return Boolean(item.favorite)
@@ -645,6 +1164,8 @@ function categoryMatches(item, categoryId) {
           String(item.login?.totp ?? '').trim(),
         )
       )
+    case 'ssh-keys':
+      return Number(item.type) === 5
     case 'notes':
       return Number(item.type) === 2
     case 'cards':
@@ -667,7 +1188,9 @@ function folderCount(folderId) {
   const normalizedFolderId = normalizeId(folderId)
 
   return (props.items ?? []).filter(item =>
-    normalizeId(item.folderId) === normalizedFolderId,
+    !isDeletedItem(item)
+    && normalizeId(item.folderId)
+      === normalizedFolderId,
   ).length
 }
 
@@ -681,7 +1204,11 @@ function itemBelongsToCollection(item, collectionId) {
 
 function collectionCount(collectionId) {
   return (props.items ?? []).filter(item =>
-    itemBelongsToCollection(item, collectionId),
+    !isDeletedItem(item)
+    && itemBelongsToCollection(
+      item,
+      collectionId,
+    ),
   ).length
 }
 
@@ -696,6 +1223,24 @@ function revisionTimestamp(item) {
 
 const filtered = computed(() => {
   let list = [...(props.items ?? [])]
+
+  // Ordner und Sammlungen dürfen keine gelöschten
+  // Einträge anzeigen.
+  if (selectedCategory.value !== 'trash') {
+    list = list.filter(item =>
+      !isDeletedItem(item),
+    )
+  }
+
+  if (searchScope.value === 'personal') {
+    list = list.filter(item =>
+      normalizeId(item.organizationId) === null,
+    )
+  } else if (searchScope.value === 'organization') {
+    list = list.filter(item =>
+      normalizeId(item.organizationId) !== null,
+    )
+  }
 
   if (selectedCollection.value !== null) {
     list = list.filter(item =>
@@ -782,6 +1327,30 @@ const activeFilterLabel = computed(() => {
 })
 
 watch(
+  allCollectionRows,
+  rows => {
+    if (navigationInitialized.value) {
+      return
+    }
+
+    const mode = initialNavigationMode()
+
+    collapsedCollectionPaths.value = mode === 'expanded'
+      ? new Set()
+      : new Set(
+        rows
+          .filter(collection => collection.hasChildren)
+          .map(collection => collection.nodeKey),
+      )
+
+    navigationInitialized.value = true
+  },
+  {
+    immediate: true,
+  },
+)
+
+watch(
   () => props.folders,
   nextFolders => {
     if (
@@ -837,6 +1406,9 @@ watch(
     emit('filter-change', {
       items: [...filteredItems],
       label,
+
+      trash:
+        selectedCategory.value === 'trash',
     })
   },
   {
@@ -859,6 +1431,58 @@ watch(
 /* ── Suchleiste ── */
 .bw-vault__search {
   padding: 0.75rem 0.75rem 0.5rem;
+}
+
+.bw-vault__main-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius);
+  background: var(--color-main-background);
+}
+
+.bw-vault__main-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.25rem 0.35rem;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-main-text);
+}
+
+.bw-vault__search-scope {
+  flex: 0 0 auto;
+  min-width: 8.4rem;
+  padding: 0.25rem 0.35rem;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  outline: 0;
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+}
+
+.bw-vault__search-clear {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-main-text);
+  cursor: pointer;
+}
+
+.bw-vault__search-clear:hover,
+.bw-vault__search-clear:focus-visible {
+  background: var(--color-background-hover);
 }
 
 .bw-vault__sort {
@@ -897,17 +1521,68 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.35rem;
   padding-right: 0.5rem;
 }
 
+.bw-vault__section-heading-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.bw-vault__section-toggle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0 0 0 0.5rem;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-main-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bw-vault__section-toggle:hover,
+.bw-vault__section-toggle:focus-visible {
+  background: var(--color-background-hover);
+}
+
 .bw-vault__section-title {
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 0.25rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text-maxcontrast);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.bw-vault__tree-action {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-maxcontrast);
+  cursor: pointer;
+}
+
+.bw-vault__tree-action:hover,
+.bw-vault__tree-action:focus-visible {
+  background: var(--color-background-hover);
+  color: var(--color-main-text);
+}
+
+.bw-vault__tree-action:disabled {
+  cursor: default;
+  opacity: 0.35;
 }
 
 .bw-vault__section-action {
@@ -1088,6 +1763,12 @@ watch(
   color: var(--color-main-text);
 }
 
+.bw-drop-target--active {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: -2px;
+  background: var(--color-primary-element-light) !important;
+}
+
 /* ── Footer ── */
 .bw-vault__footer {
   display:       flex;
@@ -1097,4 +1778,212 @@ watch(
   border-top:    1px solid var(--color-border);
   background:    var(--color-navigation-bg, var(--color-main-background-translucent));
 }
+
+.bw-folder--active,
+.bw-folder-row--active {
+  box-shadow:
+    inset 3px 0 0 var(--color-primary-element);
+}
+
+.bw-folder-row__actions {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+}
+
+.bw-folder-row:hover .bw-folder-row__actions,
+.bw-folder-row:focus-within .bw-folder-row__actions,
+.bw-folder-row--active .bw-folder-row__actions {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.bw-vault__section-action {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.bw-vault__section-heading:hover
+  .bw-vault__section-action,
+.bw-vault__section-heading:focus-within
+  .bw-vault__section-action {
+  opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .bw-folder-row__actions {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .bw-vault__section-action {
+    opacity: 1;
+  }
+}
+
+/*
+ * Editable folder and collection rows:
+ * name | actions | count
+ */
+.bw-folder-row__actions {
+  padding-right: 0 !important;
+}
+
+.bw-folder-row__count {
+  min-width: 1.7rem;
+  flex: 0 0 auto;
+  margin-right: 0.75rem;
+  margin-left: 0.2rem;
+  text-align: center;
+}
+
+/*
+ * The count remains visible while the action area follows the
+ * existing hover/focus/active visibility rules.
+ */
+.bw-folder-row--active
+  .bw-folder-row__count {
+  color: var(--color-main-text);
+}
+
+.bw-collection-search {
+  position: relative;
+}
+
+.bw-collection-search input[type="search"] {
+  padding-right: 2.65rem !important;
+}
+
+.bw-collection-search input[type="search"]::-webkit-search-cancel-button {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.bw-collection-search > button {
+  position: absolute !important;
+  top: 50%;
+  right: 0.45rem;
+  z-index: 3;
+
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 !important;
+  margin: 0;
+
+  border: 0 !important;
+  border-radius: 50%;
+  background: transparent !important;
+  color: var(--color-main-text) !important;
+
+  opacity: 0.72 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.bw-collection-search > button:hover,
+.bw-collection-search > button:focus-visible {
+  background: var(--color-background-hover) !important;
+  color: var(--color-main-text) !important;
+  opacity: 1 !important;
+}
+
+.bw-collection-search > button svg {
+  display: block;
+}
+
+/* kompakte Hauptsuche mit Icon-Umschaltung */
+
+.bw-vault__main-search {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.3rem;
+}
+
+.bw-vault__main-search input {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  flex: 1 1 auto;
+  padding: 0.25rem 0.35rem;
+}
+
+.bw-vault__search-clear {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.bw-vault__scope-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  margin-left: auto;
+  padding-left: 0.3rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.bw-vault__scope-button {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--border-radius);
+  appearance: none;
+  background: transparent;
+  color: var(--color-main-text);
+  cursor: pointer;
+}
+
+.bw-vault__scope-button:hover,
+.bw-vault__scope-button:focus-visible {
+  background: var(--color-background-hover);
+}
+
+.bw-vault__scope-button--active {
+  background: var(--color-primary-element);
+  color:
+    var(
+      --color-primary-element-text,
+      white
+    );
+}
+
+.bw-vault__scope-button--active:hover,
+.bw-vault__scope-button--active:focus-visible {
+  background: var(--color-primary-element-hover);
+}
+
+.bw-vault__scope-both {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bw-vault__scope-both > :last-child {
+  margin-left: -3px;
+}
+
 </style>

@@ -10,6 +10,7 @@ use OCP\Util;
 final class Personal implements ISettings {
 	public function getForm(): TemplateResponse {
 		Util::addScript(Application::APP_ID, 'nc_bitwarden-settings');
+		Util::addStyle(Application::APP_ID, 'nc_bitwarden-settings');
 		return new TemplateResponse(Application::APP_ID, 'settings');
 	}
 	public function getSection(): string {
