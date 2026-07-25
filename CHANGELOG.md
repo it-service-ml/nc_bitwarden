@@ -12,6 +12,7 @@ during the post-release review of 2.0.0.
 - Login items now support creating, editing, preserving and deleting multiple
   URLs without discarding all URLs after the first one
 - URL match detection settings are preserved and can be edited
+- URL match detection is hidden behind an advanced control by default
 - Search now covers common decrypted item metadata instead of only item names
 - Removed the obsolete server-side `clipboard_timeout` user preference
 - Replaced visible hard-coded German labels in the item form and search scope

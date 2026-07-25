@@ -541,5 +541,7 @@ $TRANSLATIONS = [
 	'Updated when the item is saved' => 'Wird beim Speichern aktualisiert',
 	'Search scope' => 'Suchbereich',
 	'Personal and organization vaults' => 'Persönlicher Tresor und Organisationen',
+	'Advanced' => 'Erweitert',
+	'Hide advanced settings' => 'Erweiterte Einstellungen ausblenden',
 ];
 $PLURAL_FORMS = 'nplurals=2; plural=(n != 1);';

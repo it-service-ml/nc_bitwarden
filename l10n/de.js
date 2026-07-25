@@ -541,7 +541,9 @@ OC.L10N.register(
     "Set when the item is saved": "Wird beim Speichern gesetzt",
     "Updated when the item is saved": "Wird beim Speichern aktualisiert",
     "Search scope": "Suchbereich",
-    "Personal and organization vaults": "Persönlicher Tresor und Organisationen"
+    "Personal and organization vaults": "Persönlicher Tresor und Organisationen",
+    "Advanced": "Erweitert",
+    "Hide advanced settings": "Erweiterte Einstellungen ausblenden"
 },
     "nplurals=2; plural=(n != 1);"
 );

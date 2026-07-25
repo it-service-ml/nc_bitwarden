@@ -359,7 +359,31 @@
                     class="bw-form__uri-input"
                   />
 
-                  <div class="bw-form__uri-match">
+                  <button
+                    type="button"
+                    class="bw-form__uri-advanced"
+                    :aria-expanded="loginUri.advanced"
+                    @click="
+                      loginUri.advanced = !loginUri.advanced
+                    "
+                  >
+                    {{
+                      loginUri.advanced
+                        ? t(
+                          'nc_bitwarden',
+                          'Hide advanced settings',
+                        )
+                        : t(
+                          'nc_bitwarden',
+                          'Advanced',
+                        )
+                    }}
+                  </button>
+
+                  <div
+                    v-if="loginUri.advanced"
+                    class="bw-form__uri-match"
+                  >
                     <label :for="`bw-uri-match-${index}`">
                       {{
                         t(
@@ -995,6 +1019,7 @@ function normalizeLoginUri(entry = {}) {
     match: [0, 1, 2, 3, 4, 5].includes(numericMatch)
       ? numericMatch
       : null,
+    advanced: numericMatch !== null,
   }
 }
 
@@ -1222,6 +1247,12 @@ function serializedFormState() {
     form: {
       ...form,
       collectionIds: [...form.collectionIds],
+      uris: form.uris.map(loginUri => ({
+        uri: String(loginUri.uri ?? ''),
+        match: loginUri.match === null
+          ? null
+          : Number(loginUri.match),
+      })),
       fields: form.fields.map(field => ({
         localId: field.localId,
         type: Number(field.type),
@@ -3028,12 +3059,16 @@ async function save() {
 
 .bw-form__uri-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) auto;
+  grid-template-areas:
+    "url advanced remove"
+    "match match match";
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 0.75rem;
 }
 
 .bw-form__uri-input {
+  grid-area: url;
   min-width: 0;
   margin-bottom: 0;
 }
@@ -3041,6 +3076,7 @@ async function save() {
 .bw-form__uri-match {
   display: flex;
   min-width: 0;
+  grid-area: match;
   flex-direction: column;
   gap: 0.25rem;
 }
@@ -3051,9 +3087,30 @@ async function save() {
   font-weight: 600;
 }
 
+.bw-form__uri-advanced {
+  display: inline-flex;
+  min-height: 36px;
+  grid-area: advanced;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius);
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bw-form__uri-advanced:hover,
+.bw-form__uri-advanced:focus-visible {
+  background: var(--color-background-hover);
+}
+
 .bw-form__uri-remove {
   display: inline-flex;
   width: 36px;
+  grid-area: remove;
   height: 36px;
   align-items: center;
   justify-content: center;
@@ -3074,7 +3131,15 @@ async function save() {
 
 @media (max-width: 720px) {
   .bw-form__uri-row {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "url remove"
+      "advanced advanced"
+      "match match";
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bw-form__uri-advanced {
+    justify-self: start;
   }
 
   .bw-form__uri-remove {
