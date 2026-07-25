@@ -231,7 +231,7 @@
         </NcButton>
 
         <NcButton
-          type="primary"
+          variant="primary"
           :disabled="!canApply"
           @click="apply"
         >

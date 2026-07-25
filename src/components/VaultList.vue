@@ -1070,7 +1070,6 @@ function selectCategory(categoryId) {
   selectedCollection.value = null
 
   emit('navigate')
-  emitCurrentFilter()
 }
 
 function selectFolder(folderId) {
@@ -1082,7 +1081,6 @@ function selectFolder(folderId) {
   selectedCategory.value = 'all'
 
   emit('navigate')
-  emitCurrentFilter()
 }
 
 function selectCollection(collectionId) {
@@ -1091,7 +1089,6 @@ function selectCollection(collectionId) {
   selectedCategory.value = 'all'
 
   emit('navigate')
-  emitCurrentFilter()
 }
 
 function toggleSection(section) {
@@ -1453,7 +1450,6 @@ watch(
       selectedCategory.value = 'all'
 
       emit('navigate')
-      emitCurrentFilter()
     }
   },
   {

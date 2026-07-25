@@ -348,7 +348,12 @@ dialog inside Warden.
 ## Self-hosted server restrictions
 
 Warden accepts only HTTPS base URLs with a hostname. Literal IP addresses and
-common private hostname suffixes are rejected.
+common private hostname suffixes are rejected. Server-side provider requests
+do not follow HTTP redirects.
+
+Administrator-defined inherited provider endpoints may use trusted internal
+DNS. User-selected self-hosted providers must resolve only to public,
+non-reserved addresses.
 
 The Nextcloud setting `allow_local_remote_servers` does not override Warden's
 own provider validation. A self-hosted provider should use a valid DNS hostname

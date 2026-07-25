@@ -23,7 +23,7 @@ final class SsoService {
 	private const CLIENT_VERSION = '2026.7.0';
 
 	private array $baseOptions = [
-		'allow_redirects' => true,
+		'allow_redirects' => false,
 		'timeout' => 20,
 		'connect_timeout' => 10,
 	];
@@ -378,6 +378,10 @@ final class SsoService {
 
 	private function getSelfHostedSettings(string $userId): array {
 		$settings = $this->settingsService->getSettings($userId);
+
+		$this->settingsService->assertProviderAccessAllowed(
+			$userId,
+		);
 
 		if (empty($settings['sso_enabled'])) {
 			throw new \RuntimeException(

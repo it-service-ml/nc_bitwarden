@@ -246,7 +246,7 @@
       </NcNoteCard>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="loading || saving || !!urlError || attachmentLimitLoading || !!attachmentLimitError"
         @click="save('server')"
       >
@@ -319,7 +319,7 @@
       </NcNoteCard>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="loading || saving || !!policyError"
         @click="save('policy')"
       >
@@ -398,7 +398,7 @@
       </NcNoteCard>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="loading || saving || !!supportUrlError || !!supportEmailError"
         @click="save('notice')"
       >

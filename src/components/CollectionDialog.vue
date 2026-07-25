@@ -71,7 +71,7 @@
       </NcButton>
 
       <NcButton
-        type="primary"
+        variant="primary"
         :disabled="saving || !canSave"
         @click="save"
       >
