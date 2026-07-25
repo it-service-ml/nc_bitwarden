@@ -564,7 +564,6 @@ final class UserSettingsService {
 		array $preferences,
 	): array {
 		$defaults = [
-			'clipboard_timeout' => 30,
 			'start_category' => 'all',
 			'navigation_start_mode' => 'personal_expanded',
 			'default_target_mode' => 'personal',
@@ -590,11 +589,6 @@ final class UserSettingsService {
 		];
 
 		$value = array_merge($defaults, $preferences);
-
-		$clipboardTimeout = (int)$value['clipboard_timeout'];
-		if (!in_array($clipboardTimeout, [0, 15, 30, 60], true)) {
-			$clipboardTimeout = $defaults['clipboard_timeout'];
-		}
 
 		$startCategory = $this->allowedString(
 			$value['start_category'],
@@ -669,7 +663,6 @@ final class UserSettingsService {
 		);
 
 		return [
-			'clipboard_timeout' => $clipboardTimeout,
 			'start_category' => $startCategory,
 			'navigation_start_mode' => $navigationStartMode,
 			'default_target_mode' => $defaultTargetMode,

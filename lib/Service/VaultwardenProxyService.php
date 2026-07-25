@@ -403,19 +403,14 @@ final class VaultwardenProxyService {
 			),
 		);
 
-		if (
-			!in_array(
-				$downloadScheme,
-				['http', 'https'],
-				true,
-			)
-		) {
+		if ($downloadScheme !== 'https') {
 			throw new \RuntimeException(
-				'Vaultwarden hat eine ungültige '
-					. 'Download-URL zurückgegeben.',
+				'The attachment download URL must use HTTPS.',
 				502,
 			);
 		}
+
+		$this->assertSafeDownloadUrl($downloadUrl, $urls['api']);
 
 		/*
 		 * Für diese URL keine Authorization mitsenden:
@@ -429,7 +424,7 @@ final class VaultwardenProxyService {
 			[
 				'timeout' => 300,
 				'connect_timeout' => 20,
-				'allow_redirects' => true,
+				'allow_redirects' => false,
 			],
 		);
 
@@ -442,9 +437,170 @@ final class VaultwardenProxyService {
 			throw $this->wrappedApiException($e);
 		}
 
+		$statusCode = (int)$fileResponse->getStatusCode();
+
+		if ($statusCode >= 300 && $statusCode <= 399) {
+			throw new \RuntimeException(
+				'Attachment download redirects are not allowed.',
+				502,
+			);
+		}
+
 		return $this->responseBodyToString(
 			$fileResponse->getBody(),
 		);
+	}
+
+	private function assertSafeDownloadUrl(
+		string $url,
+		string $providerApiUrl,
+	): void {
+		$parts = parse_url($url);
+		$providerParts = parse_url($providerApiUrl);
+
+		if (
+			$parts === false
+			|| strtolower((string)($parts['scheme'] ?? ''))
+				!== 'https'
+			|| empty($parts['host'])
+			|| isset($parts['user'])
+			|| isset($parts['pass'])
+		) {
+			throw new \RuntimeException(
+				'The attachment download URL is invalid.',
+				502,
+			);
+		}
+
+		if (
+			$providerParts === false
+			|| empty($providerParts['host'])
+		) {
+			throw new \RuntimeException(
+				'The configured provider URL is invalid.',
+				502,
+			);
+		}
+
+		$host = strtolower(
+			rtrim((string)$parts['host'], '.'),
+		);
+
+		$providerHost = strtolower(
+			rtrim(
+				(string)$providerParts['host'],
+				'.',
+			),
+		);
+
+		$isProviderHost = hash_equals(
+			$providerHost,
+			$host,
+		);
+
+		if (
+			filter_var(
+				$host,
+				FILTER_VALIDATE_IP,
+			) !== false
+			&& !$isProviderHost
+		) {
+			throw new \RuntimeException(
+				'IP addresses are not allowed in external attachment download URLs.',
+				502,
+			);
+		}
+
+		foreach (
+			[
+				'localhost',
+				'.local',
+				'.internal',
+				'.lan',
+				'.corp',
+				'.home',
+			] as $blockedSuffix
+		) {
+			if (
+				!$isProviderHost
+				&& (
+					$host === ltrim(
+						$blockedSuffix,
+						'.',
+					)
+					|| str_ends_with(
+						$host,
+						$blockedSuffix,
+					)
+				)
+			) {
+				throw new \RuntimeException(
+					'Private external attachment download hosts are not allowed.',
+					502,
+				);
+			}
+		}
+
+		$addresses = [];
+
+		$records = @dns_get_record(
+			$host,
+			DNS_A | DNS_AAAA,
+		);
+
+		if (is_array($records)) {
+			foreach ($records as $record) {
+				$address = $record['ip']
+					?? $record['ipv6']
+					?? null;
+
+				if (is_string($address)) {
+					$addresses[] = $address;
+				}
+			}
+		}
+
+		if ($addresses === []) {
+			$ipv4Addresses = @gethostbynamel(
+				$host,
+			);
+
+			if (is_array($ipv4Addresses)) {
+				$addresses = $ipv4Addresses;
+			}
+		}
+
+		if ($addresses === []) {
+			throw new \RuntimeException(
+				'The attachment download host could not be resolved.',
+				502,
+			);
+		}
+
+		/*
+		 * The configured provider host is already an explicitly
+		 * selected server. External storage hosts must additionally
+		 * resolve only to public addresses.
+		 */
+		if ($isProviderHost) {
+			return;
+		}
+
+		foreach (array_unique($addresses) as $address) {
+			if (
+				filter_var(
+					$address,
+					FILTER_VALIDATE_IP,
+					FILTER_FLAG_NO_PRIV_RANGE
+						| FILTER_FLAG_NO_RES_RANGE,
+				) === false
+			) {
+				throw new \RuntimeException(
+					'The external attachment download host resolves to a private or reserved address.',
+					502,
+				);
+			}
+		}
 	}
 
 	private function wrappedApiException(
