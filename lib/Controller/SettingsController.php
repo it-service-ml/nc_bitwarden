@@ -20,20 +20,96 @@ final class SettingsController extends Controller {
 
 	#[NoAdminRequired]
 	public function getSettings(): JSONResponse {
-		return new JSONResponse($this->settingsService->getSettings($this->userId));
+		return new JSONResponse(
+			$this->settingsService->getSettings(
+				$this->userId,
+			),
+		);
+	}
+
+	#[NoAdminRequired]
+	public function getPreferences(): JSONResponse {
+		return new JSONResponse(
+			$this->settingsService->getUserPreferences(
+				$this->userId,
+			),
+		);
+	}
+
+	#[NoAdminRequired]
+	public function savePreferences(): JSONResponse {
+		try {
+			$preferences = $this->request->getParam(
+				'preferences',
+				[],
+			);
+
+			if (!is_array($preferences)) {
+				throw new \InvalidArgumentException(
+					'Invalid preferences payload',
+				);
+			}
+
+			return new JSONResponse(
+				$this->settingsService->saveUserPreferences(
+					$this->userId,
+					$preferences,
+				),
+			);
+		} catch (
+			\InvalidArgumentException
+			| \JsonException $e
+		) {
+			return new JSONResponse(
+				['error' => $e->getMessage()],
+				400,
+			);
+		}
 	}
 
 	#[NoAdminRequired]
 	public function saveSettings(): JSONResponse {
 		try {
+			$useNextcloudEmail = filter_var(
+				$this->request->getParam(
+					'use_nextcloud_email',
+					true,
+				),
+				FILTER_VALIDATE_BOOLEAN,
+				FILTER_NULL_ON_FAILURE,
+			);
+
+			if ($useNextcloudEmail === null) {
+				throw new \InvalidArgumentException(
+					'Invalid value for use_nextcloud_email',
+				);
+			}
+
 			$this->settingsService->saveSettings(
 				$this->userId,
-				(string)$this->request->getParam('server_type', 'cloud_us'),
-				(string)$this->request->getParam('custom_url', '')
+				(string)$this->request->getParam(
+					'server_type',
+					'cloud_us',
+				),
+				(string)$this->request->getParam(
+					'custom_url',
+					'',
+				),
+				$useNextcloudEmail,
+				(string)$this->request->getParam(
+					'login_email',
+					'',
+				),
 			);
-			return new JSONResponse(['status' => 'ok']);
+
+			return new JSONResponse([
+				'status' => 'ok',
+			]);
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['error' => $e->getMessage()], 400);
+			return new JSONResponse(
+				['error' => $e->getMessage()],
+				400,
+			);
 		}
 	}
 }

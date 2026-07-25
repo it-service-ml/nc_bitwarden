@@ -105,10 +105,62 @@
       />
     </div>
 
+    <div
+      v-if="classicLoginAllowed"
+      class="bw-settings__email"
+    >
+      <h4>
+        {{ t('nc_bitwarden', 'Login email') }}
+      </h4>
+
+      <NcCheckboxRadioSwitch
+        v-model="form.use_nextcloud_email"
+        class="bw-settings__compact-switch"
+        type="switch"
+        :disabled="saving"
+      >
+        {{
+          t(
+            'nc_bitwarden',
+            'Use email address from Nextcloud',
+          )
+        }}
+      </NcCheckboxRadioSwitch>
+
+      <NcTextField
+        v-if="!form.use_nextcloud_email"
+        v-model="form.login_email"
+        type="email"
+        autocomplete="email"
+        :label="
+          t(
+            'nc_bitwarden',
+            'Email address for Bitwarden/Vaultwarden login',
+          )
+        "
+        :helper-text="
+          emailError
+            || t(
+              'nc_bitwarden',
+              'This address is used for the classic Bitwarden/Vaultwarden login.',
+            )
+        "
+        :disabled="saving"
+      />
+
+      <p class="bw-settings__email-hint">
+        {{
+          t(
+            'nc_bitwarden',
+            'For SSO, the email address supplied by the identity provider is used.',
+          )
+        }}
+      </p>
+    </div>
+
     <NcButton
-      v-if="canEdit"
       type="primary"
-      :disabled="saving || !!urlError"
+      :disabled="saving || !!urlError || !!emailError"
       @click="save"
     >
       {{
@@ -121,6 +173,7 @@
 </template>
 
 <script setup>
+
 import {
   computed,
   onMounted,
@@ -137,9 +190,12 @@ import { VaultwardenApi } from '../services/api.js'
 const form = reactive({
   server_type: 'cloud_us',
   custom_url: '',
+  use_nextcloud_email: true,
+  login_email: '',
 })
 
 const canEdit = ref(true)
+const classicLoginAllowed = ref(true)
 const inherited = ref(false)
 const saved = ref(false)
 const error = ref('')
@@ -169,12 +225,45 @@ const urlError = computed(() => {
   }
 })
 
+const emailError = computed(() => {
+  if (!classicLoginAllowed.value) {
+    return ''
+  }
+
+  if (form.use_nextcloud_email) {
+    return ''
+  }
+
+  const value = form.login_email.trim()
+
+  if (!value) {
+    return t(
+      'nc_bitwarden',
+      'Enter a valid email address',
+    )
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return t(
+      'nc_bitwarden',
+      'Enter a valid email address',
+    )
+  }
+
+  return ''
+})
+
 onMounted(async () => {
   try {
     const settings = await VaultwardenApi.getSettings()
 
     form.server_type = settings.server_type
     form.custom_url = settings.custom_url
+    form.use_nextcloud_email
+      = settings.use_nextcloud_email !== false
+    form.login_email = settings.login_email ?? ''
+    classicLoginAllowed.value
+      = settings.classic_login_allowed !== false
     canEdit.value = settings.can_edit !== false
     inherited.value = settings.inherited === true
   } catch {
@@ -186,7 +275,7 @@ onMounted(async () => {
 })
 
 async function save() {
-  if (urlError.value) {
+  if (urlError.value || emailError.value) {
     return
   }
 
@@ -198,6 +287,8 @@ async function save() {
     await VaultwardenApi.saveSettings({
       server_type: form.server_type,
       custom_url: form.custom_url,
+      use_nextcloud_email: form.use_nextcloud_email,
+      login_email: form.login_email.trim(),
     })
 
     inherited.value = false
@@ -221,7 +312,7 @@ async function save() {
 <style scoped>
 .bw-settings {
   max-width: 560px;
-  padding: 1rem 0;
+  padding: 1rem 2rem 2rem;
 }
 
 .bw-settings__desc {
@@ -239,4 +330,40 @@ async function save() {
 .bw-settings__custom {
   margin-bottom: 1rem;
 }
+.bw-settings__email {
+  margin: 1.5rem 0;
+}
+
+.bw-settings__email h4 {
+  margin-bottom: 0.75rem;
+}
+
+.bw-settings__email-hint {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-maxcontrast);
+  font-size: 0.9rem;
+}
+
+.bw-settings__compact-switch {
+  display: inline-flex;
+  width: fit-content;
+}
+
+/*
+ * Der Nextcloud-Schalter färbt sonst beim Hover/Fokus die komplette
+ * Beschriftungszeile ein. Gewünscht ist ausschließlich der kompakte Toggle.
+ */
+.bw-settings__compact-switch :deep(.checkbox-radio-switch__content),
+.bw-settings__compact-switch :deep(.checkbox-radio-switch__content:hover) {
+  padding-inline: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+@media (max-width: 600px) {
+  .bw-settings {
+    padding-inline: 1rem;
+  }
+}
+
 </style>

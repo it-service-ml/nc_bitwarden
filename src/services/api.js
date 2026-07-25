@@ -6,6 +6,19 @@ const base = (path) => generateUrl(`/apps/nc_bitwarden${path}`)
 export const VaultwardenApi = {
   async getSettings() { return (await axios.get(base('/settings'))).data },
   async saveSettings(data) { return (await axios.post(base('/settings'), data)).data },
+  async getPreferences() {
+    return (
+      await axios.get(base('/settings/preferences'))
+    ).data
+  },
+  async savePreferences(preferences) {
+    return (
+      await axios.post(
+        base('/settings/preferences'),
+        { preferences },
+      )
+    ).data
+  },
 
   async getAdminSettings() {
     return (
@@ -54,6 +67,42 @@ export const VaultwardenApi = {
     return (await axios.post(base('/api/login'), data)).data
   },
   async refresh() { return (await axios.post(base('/api/refresh'))).data },
+  async setMasterPassword(data) {
+    return (
+      await axios.post(
+        base('/api/accounts/set-password'),
+        data,
+      )
+    ).data
+  },
+
+  async changeMasterPassword(data) {
+    return (
+      await axios.post(
+        base('/api/accounts/password'),
+        data,
+      )
+    ).data
+  },
+
+  getSsoStartUrl() {
+    return base('/sso/start')
+  },
+
+  async completeSsoTwoFactor(twoFactorToken) {
+    return (
+      await axios.post(
+        base('/api/sso/two-factor'),
+        { twoFactorToken },
+      )
+    ).data
+  },
+
+  async getSsoResult() {
+    return (
+      await axios.get(base('/api/sso/result'))
+    ).data
+  },
 
   async sync() { return (await axios.get(base('/api/sync'))).data },
   async getCiphers() { return (await axios.get(base('/api/ciphers'))).data },
@@ -66,6 +115,15 @@ export const VaultwardenApi = {
   async createOrganizationCipher(data) {
     return (
       await axios.post(base('/api/ciphers/create'), data)
+    ).data
+  },
+
+  async shareCipher(id, data) {
+    return (
+      await axios.post(
+        base(`/api/ciphers/${id}/share`),
+        data,
+      )
     ).data
   },
 
@@ -83,7 +141,99 @@ export const VaultwardenApi = {
       await axios.put(base(`/api/ciphers/${id}`), data)
     ).data
   },
-  async deleteCipher(id) { return (await axios.delete(base(`/api/ciphers/${id}`))).data },
+  async updateCipherPartial(id, data) {
+    return (
+      await axios.post(
+        base(`/api/ciphers/${id}/partial`),
+        data,
+      )
+    ).data
+  },
+  async trashCipher(id) {
+    return (
+      await axios.put(
+        base(`/api/ciphers/${id}/delete`),
+      )
+    ).data
+  },
+
+  async restoreCipher(id) {
+    return (
+      await axios.put(
+        base(`/api/ciphers/${id}/restore`),
+      )
+    ).data
+  },
+
+  async deleteCipher(id) {
+    return (
+      await axios.delete(
+        base(`/api/ciphers/${id}`),
+      )
+    ).data
+  },
+
+  async createAttachment(id, data) {
+    return (
+      await axios.post(
+        base(`/api/ciphers/${id}/attachment/v2`),
+        data,
+      )
+    ).data
+  },
+
+  async uploadAttachment(
+    id,
+    attachmentId,
+    encryptedData,
+    encryptedFileName,
+  ) {
+    const formData = new FormData()
+
+    formData.append(
+      'data',
+      new Blob(
+        [encryptedData],
+        { type: 'application/octet-stream' },
+      ),
+      encryptedFileName || 'data',
+    )
+
+    return (
+      await axios.post(
+        base(
+          `/api/ciphers/${id}`
+          + `/attachment/${attachmentId}`,
+        ),
+        formData,
+      )
+    ).data
+  },
+
+  async downloadAttachment(id, attachmentId) {
+    return (
+      await axios.get(
+        base(
+          `/api/ciphers/${id}`
+          + `/attachment/${attachmentId}`,
+        ),
+        {
+          responseType: 'arraybuffer',
+        },
+      )
+    ).data
+  },
+
+  async deleteAttachment(id, attachmentId) {
+    return (
+      await axios.delete(
+        base(
+          `/api/ciphers/${id}`
+          + `/attachment/${attachmentId}`,
+        ),
+      )
+    ).data
+  },
 
   async getFolders() { return (await axios.get(base('/api/folders'))).data },
   async createFolder(data) { return (await axios.post(base('/api/folders'), data)).data },

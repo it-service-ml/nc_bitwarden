@@ -13,6 +13,8 @@
       <PasswordGenerator
         v-model="password"
         :initially-expanded="true"
+        :show-toggle="false"
+        :preferences="preferences"
       />
     </div>
 
@@ -31,6 +33,13 @@ import NcDialog from '@nextcloud/vue/components/NcDialog'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcPasswordField from '@nextcloud/vue/components/NcPasswordField'
 import PasswordGenerator from './PasswordGenerator.vue'
+
+defineProps({
+  preferences: {
+    type: Object,
+    default: () => ({}),
+  },
+})
 
 defineEmits(['close'])
 

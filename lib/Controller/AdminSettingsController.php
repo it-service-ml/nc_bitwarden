@@ -39,6 +39,102 @@ final class AdminSettingsController extends Controller {
 				);
 			}
 
+			$ssoEnabled = filter_var(
+				$this->request->getParam(
+					'sso_enabled',
+					false,
+				),
+				FILTER_VALIDATE_BOOLEAN,
+				FILTER_NULL_ON_FAILURE,
+			);
+
+			if ($ssoEnabled === null) {
+				throw new \InvalidArgumentException(
+					'Invalid value for sso_enabled',
+				);
+			}
+
+			$classicLoginAllowed = filter_var(
+				$this->request->getParam(
+					'classic_login_allowed',
+					true,
+				),
+				FILTER_VALIDATE_BOOLEAN,
+				FILTER_NULL_ON_FAILURE,
+			);
+
+			if ($classicLoginAllowed === null) {
+				throw new \InvalidArgumentException(
+					'Invalid value for classic_login_allowed',
+				);
+			}
+
+			$tabUnlockMode = (string)$this->request->getParam(
+				'tab_unlock_mode',
+				'user_choice',
+			);
+
+			$tabUnlockDefault = $this->booleanParam(
+				'tab_unlock_default',
+				true,
+			);
+
+			$ssoPasswordMinLength = filter_var(
+				$this->request->getParam(
+					'sso_password_min_length',
+					12,
+				),
+				FILTER_VALIDATE_INT,
+			);
+
+			if ($ssoPasswordMinLength === false) {
+				throw new \InvalidArgumentException(
+					'Invalid value for sso_password_min_length',
+				);
+			}
+
+			$ssoPasswordRequireLower = $this->booleanParam(
+				'sso_password_require_lower',
+				false,
+			);
+			$ssoPasswordRequireUpper = $this->booleanParam(
+				'sso_password_require_upper',
+				false,
+			);
+			$ssoPasswordRequireNumber = $this->booleanParam(
+				'sso_password_require_number',
+				false,
+			);
+			$ssoPasswordRequireSpecial = $this->booleanParam(
+				'sso_password_require_special',
+				false,
+			);
+
+			$organizationNoticeEnabled = $this->booleanParam(
+				'organization_notice_enabled',
+				false,
+			);
+			$organizationNoticeTitle = (string)$this->request->getParam(
+				'organization_notice_title',
+				'',
+			);
+			$organizationNoticeMessage = (string)$this->request->getParam(
+				'organization_notice_message',
+				'',
+			);
+			$organizationNoticeSupportUrl = (string)$this->request->getParam(
+				'organization_notice_support_url',
+				'',
+			);
+			$organizationNoticeSupportLabel = (string)$this->request->getParam(
+				'organization_notice_support_label',
+				'',
+			);
+			$organizationNoticeSupportEmail = (string)$this->request->getParam(
+				'organization_notice_support_email',
+				'',
+			);
+
 			$this->settingsService->saveAdminSettings(
 				(string)$this->request->getParam(
 					'server_type',
@@ -49,6 +145,24 @@ final class AdminSettingsController extends Controller {
 					'',
 				),
 				$allowUserOverride,
+				$ssoEnabled,
+				$classicLoginAllowed,
+				$tabUnlockMode,
+				$tabUnlockDefault,
+				$ssoPasswordMinLength,
+				$ssoPasswordRequireLower,
+				$ssoPasswordRequireUpper,
+				$ssoPasswordRequireNumber,
+				$ssoPasswordRequireSpecial,
+			);
+
+			$this->settingsService->saveOrganizationNoticeSettings(
+				$organizationNoticeEnabled,
+				$organizationNoticeTitle,
+				$organizationNoticeMessage,
+				$organizationNoticeSupportUrl,
+				$organizationNoticeSupportLabel,
+				$organizationNoticeSupportEmail,
 			);
 
 			return new JSONResponse([
@@ -60,5 +174,24 @@ final class AdminSettingsController extends Controller {
 				400,
 			);
 		}
+	}
+
+	private function booleanParam(
+		string $name,
+		bool $default,
+	): bool {
+		$value = filter_var(
+			$this->request->getParam($name, $default),
+			FILTER_VALIDATE_BOOLEAN,
+			FILTER_NULL_ON_FAILURE,
+		);
+
+		if ($value === null) {
+			throw new \InvalidArgumentException(
+				'Invalid value for ' . $name,
+			);
+		}
+
+		return $value;
 	}
 }
