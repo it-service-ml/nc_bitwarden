@@ -493,9 +493,20 @@ final class VaultwardenProxyService {
 			),
 		);
 
-		$isProviderHost = hash_equals(
-			$providerHost,
-			$host,
+		$downloadPort = isset($parts['port'])
+			? (int)$parts['port']
+			: 443;
+
+		$providerPort = isset($providerParts['port'])
+			? (int)$providerParts['port']
+			: 443;
+
+		$isProviderEndpoint = (
+			hash_equals(
+				$providerHost,
+				$host,
+			)
+			&& $providerPort === $downloadPort
 		);
 
 		if (
@@ -503,7 +514,7 @@ final class VaultwardenProxyService {
 				$host,
 				FILTER_VALIDATE_IP,
 			) !== false
-			&& !$isProviderHost
+			&& !$isProviderEndpoint
 		) {
 			throw new \RuntimeException(
 				'IP addresses are not allowed in external attachment download URLs.',
@@ -522,7 +533,7 @@ final class VaultwardenProxyService {
 			] as $blockedSuffix
 		) {
 			if (
-				!$isProviderHost
+				!$isProviderEndpoint
 				&& (
 					$host === ltrim(
 						$blockedSuffix,
@@ -582,7 +593,7 @@ final class VaultwardenProxyService {
 		 * selected server. External storage hosts must additionally
 		 * resolve only to public addresses.
 		 */
-		if ($isProviderHost) {
+		if ($isProviderEndpoint) {
 			return;
 		}
 

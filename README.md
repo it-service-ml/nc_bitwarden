@@ -29,10 +29,10 @@ Warden can connect to:
 - Self-hosted Vaultwarden instances
 - Compatible self-hosted Bitwarden instances
 
-Self-hosted servers must provide a valid HTTPS endpoint using a publicly
-resolvable hostname that is reachable from the Nextcloud server. Literal IP
-addresses and hostnames ending in `.local`, `.internal`, `.lan`, `.corp` or
-`.home` are rejected.
+Self-hosted servers must provide a valid HTTPS endpoint using a DNS hostname
+that is reachable from the Nextcloud server. Literal IP addresses and
+hostnames ending in `.local`, `.internal`, `.lan`, `.corp` or `.home` are
+rejected.
 
 ## Features
 
@@ -356,9 +356,9 @@ and a certificate trusted by the operating system and PHP environment used by
 Nextcloud.
 
 Attachment download URLs returned by a provider must use HTTPS and must not
-redirect. The configured provider host is permitted. A different host, such as
-an external object-storage service, must resolve only to public, non-reserved
-addresses.
+redirect. The configured provider hostname and HTTPS port are permitted. A
+different endpoint, such as an external object-storage service, must resolve
+only to public, non-reserved addresses.
 
 ### Private certificate authorities
 
