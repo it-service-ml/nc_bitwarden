@@ -58,6 +58,10 @@ return [
 		['name' => 'admin_settings#getSettings',  'url' => '/admin-settings', 'verb' => 'GET'],
 		['name' => 'admin_settings#saveSettings', 'url' => '/admin-settings', 'verb' => 'POST'],
 
+		['name' => 'passkey_unlock#getConfig',    'url' => '/passkey-unlock', 'verb' => 'GET'],
+		['name' => 'passkey_unlock#saveConfig',   'url' => '/passkey-unlock', 'verb' => 'POST'],
+		['name' => 'passkey_unlock#deleteConfig', 'url' => '/passkey-unlock', 'verb' => 'DELETE'],
+
 		['name' => 'settings#getSettings',      'url' => '/settings',             'verb' => 'GET'],
 		['name' => 'settings#saveSettings',     'url' => '/settings',             'verb' => 'POST'],
 		['name' => 'settings#getPreferences',   'url' => '/settings/preferences', 'verb' => 'GET'],

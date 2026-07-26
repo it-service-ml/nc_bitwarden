@@ -18,6 +18,7 @@ final class UserSettingsService {
 	private const ALLOW_USER_OVERRIDE_KEY = 'allow_user_override';
 	private const SSO_ENABLED_KEY = 'sso_enabled';
 	private const CLASSIC_LOGIN_ALLOWED_KEY = 'classic_login_allowed';
+	private const PASSKEY_UNLOCK_ENABLED_KEY = 'passkey_unlock_enabled';
 	private const TAB_UNLOCK_MODE_KEY = 'tab_unlock_mode';
 	private const TAB_UNLOCK_DEFAULT_KEY = 'tab_unlock_default';
 	private const SSO_PASSWORD_MIN_LENGTH_KEY = 'sso_password_min_length';
@@ -96,6 +97,11 @@ final class UserSettingsService {
 				$this->appName,
 				self::CLASSIC_LOGIN_ALLOWED_KEY,
 				'1',
+			) !== '0',
+			'passkey_unlock_enabled' => $this->config->getAppValue(
+				$this->appName,
+				self::PASSKEY_UNLOCK_ENABLED_KEY,
+				'0',
 			) !== '0',
 			'tab_unlock_mode' => $tabUnlockMode,
 			'tab_unlock_default' => $this->config->getAppValue(
@@ -179,6 +185,7 @@ final class UserSettingsService {
 		bool $allowUserOverride,
 		bool $ssoEnabled,
 		bool $classicLoginAllowed,
+		bool $passkeyUnlockEnabled,
 		string $tabUnlockMode,
 		bool $tabUnlockDefault,
 		int $ssoPasswordMinLength,
@@ -209,6 +216,12 @@ final class UserSettingsService {
 				),
 			);
 		}
+
+		$passkeyUnlockEnabled = (
+			$passkeyUnlockEnabled
+			&& $ssoEnabled
+			&& $serverType === 'selfhosted'
+		);
 
 		if (!in_array($tabUnlockMode, self::TAB_UNLOCK_MODES, true)) {
 			throw new \InvalidArgumentException(
@@ -253,6 +266,11 @@ final class UserSettingsService {
 			$this->appName,
 			self::CLASSIC_LOGIN_ALLOWED_KEY,
 			$classicLoginAllowed ? '1' : '0',
+		);
+		$this->config->setAppValue(
+			$this->appName,
+			self::PASSKEY_UNLOCK_ENABLED_KEY,
+			$passkeyUnlockEnabled ? '1' : '0',
 		);
 		$this->config->setAppValue(
 			$this->appName,
@@ -424,12 +442,29 @@ final class UserSettingsService {
 				!$effectiveSso
 				|| $adminSettings['classic_login_allowed']
 			),
+			'passkey_unlock_enabled' => (
+				$effectiveSso
+				&& $adminSettings['passkey_unlock_enabled']
+			),
 			'tab_unlock_mode' => $adminSettings['tab_unlock_mode'],
 			'tab_unlock_default' => $adminSettings['tab_unlock_default'],
 			'organization_notice' => $this->getOrganizationNoticeSettings(),
 			'master_password_policy' => $this->getNewSsoPasswordPolicy(),
 			'preferences' => $this->getUserPreferences($userId),
 		];
+	}
+
+	public function isPasskeyUnlockEnabled(
+		string $userId,
+	): bool {
+		$provider = $this->resolveProviderSettings($userId);
+		$adminSettings = $this->getAdminSettings();
+
+		return (
+			$provider['server_type'] === 'selfhosted'
+			&& $adminSettings['sso_enabled']
+			&& $adminSettings['passkey_unlock_enabled']
+		);
 	}
 
 	public function saveSettings(

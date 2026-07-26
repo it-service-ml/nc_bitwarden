@@ -170,7 +170,10 @@
       }}
     </NcButton>
 
-    <section class="bw-settings__passkey">
+    <section
+      v-if="passkeyUnlockEnabled"
+      class="bw-settings__passkey"
+    >
       <h3>
         {{ t('nc_bitwarden', 'Passkey vault unlock') }}
       </h3>
@@ -318,6 +321,8 @@ const saved = ref(false)
 const error = ref('')
 const saving = ref(false)
 
+const passkeyUnlockEnabled = ref(false)
+
 const passkeyEnvironment = ref({
   secureContext: globalThis.isSecureContext === true,
   webAuthnAvailable: false,
@@ -401,6 +406,8 @@ onMounted(async () => {
     form.login_email = settings.login_email ?? ''
     classicLoginAllowed.value
       = settings.classic_login_allowed !== false
+    passkeyUnlockEnabled.value
+      = settings.passkey_unlock_enabled === true
     canEdit.value = settings.can_edit !== false
     inherited.value = settings.inherited === true
   } catch {

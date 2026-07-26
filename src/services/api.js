@@ -20,6 +20,27 @@ export const VaultwardenApi = {
     ).data
   },
 
+  async getPasskeyUnlockConfig() {
+    return (
+      await axios.get(base('/passkey-unlock'))
+    ).data
+  },
+
+  async savePasskeyUnlockConfig(config) {
+    return (
+      await axios.post(
+        base('/passkey-unlock'),
+        { config },
+      )
+    ).data
+  },
+
+  async deletePasskeyUnlockConfig() {
+    return (
+      await axios.delete(base('/passkey-unlock'))
+    ).data
+  },
+
   async getAdminSettings() {
     return (
       await axios.get(base('/admin-settings'))
