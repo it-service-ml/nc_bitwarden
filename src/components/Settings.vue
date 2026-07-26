@@ -169,6 +169,118 @@
           : t('nc_bitwarden', 'Save')
       }}
     </NcButton>
+
+    <section class="bw-settings__passkey">
+      <h3>
+        {{ t('nc_bitwarden', 'Passkey vault unlock') }}
+      </h3>
+
+      <p class="bw-settings__desc">
+        {{
+          t(
+            'nc_bitwarden',
+            'Test whether this browser and security key support the WebAuthn PRF extension required for passkey-based vault unlock.',
+          )
+        }}
+      </p>
+
+      <NcNoteCard
+        v-if="!passkeyEnvironment.secureContext"
+        type="warning"
+      >
+        {{
+          t(
+            'nc_bitwarden',
+            'Passkey testing requires a secure HTTPS connection.',
+          )
+        }}
+      </NcNoteCard>
+
+      <NcNoteCard
+        v-else-if="!passkeyEnvironment.webAuthnAvailable"
+        type="warning"
+      >
+        {{
+          t(
+            'nc_bitwarden',
+            'WebAuthn is not available in this browser.',
+          )
+        }}
+      </NcNoteCard>
+
+      <NcNoteCard
+        v-else-if="passkeyEnvironment.clientPrfSupported === true"
+        type="info"
+      >
+        {{
+          t(
+            'nc_bitwarden',
+            'The browser reports WebAuthn PRF support. The security key must still be tested.',
+          )
+        }}
+      </NcNoteCard>
+
+      <NcNoteCard
+        v-else
+        type="info"
+      >
+        {{
+          t(
+            'nc_bitwarden',
+            'The browser capability report is inconclusive. The practical security-key test provides the final result.',
+          )
+        }}
+      </NcNoteCard>
+
+      <NcNoteCard
+        v-if="passkeyTestStatus === 'success'"
+        type="success"
+      >
+        {{ passkeyTestMessage }}
+      </NcNoteCard>
+
+      <NcNoteCard
+        v-else-if="passkeyTestStatus === 'unsupported'"
+        type="warning"
+      >
+        {{ passkeyTestMessage }}
+      </NcNoteCard>
+
+      <NcNoteCard
+        v-else-if="passkeyTestStatus === 'error'"
+        type="error"
+      >
+        {{ passkeyTestMessage }}
+      </NcNoteCard>
+
+      <NcButton
+        variant="secondary"
+        :disabled="passkeyTestDisabled"
+        @click="runPasskeyPrfTest"
+      >
+        <template #icon>
+          <NcLoadingIcon
+            v-if="passkeyTesting"
+            :size="20"
+          />
+        </template>
+
+        {{
+          passkeyTesting
+            ? t('nc_bitwarden', 'Testing passkey…')
+            : t('nc_bitwarden', 'Test passkey')
+        }}
+      </NcButton>
+
+      <p class="bw-settings__passkey-hint">
+        {{
+          t(
+            'nc_bitwarden',
+            'The test creates a temporary non-discoverable credential and discards it immediately. No vault key or passkey secret is stored.',
+          )
+        }}
+      </p>
+    </section>
   </div>
 </template>
 
@@ -183,9 +295,14 @@ import {
 import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
+import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import { VaultwardenApi } from '../services/api.js'
+import {
+  inspectPasskeyPrfEnvironment,
+  testPasskeyPrf,
+} from '../services/passkeyPrf.js'
 
 const form = reactive({
   server_type: 'cloud_us',
@@ -200,6 +317,23 @@ const inherited = ref(false)
 const saved = ref(false)
 const error = ref('')
 const saving = ref(false)
+
+const passkeyEnvironment = ref({
+  secureContext: globalThis.isSecureContext === true,
+  webAuthnAvailable: false,
+  capabilitiesAvailable: false,
+  clientPrfSupported: null,
+})
+
+const passkeyTesting = ref(false)
+const passkeyTestStatus = ref('idle')
+const passkeyTestMessage = ref('')
+
+const passkeyTestDisabled = computed(() => (
+  passkeyTesting.value
+  || !passkeyEnvironment.value.secureContext
+  || !passkeyEnvironment.value.webAuthnAvailable
+))
 
 const urlError = computed(() => {
   if (
@@ -254,6 +388,9 @@ const emailError = computed(() => {
 })
 
 onMounted(async () => {
+  passkeyEnvironment.value
+    = await inspectPasskeyPrfEnvironment()
+
   try {
     const settings = await VaultwardenApi.getSettings()
 
@@ -273,6 +410,88 @@ onMounted(async () => {
     )
   }
 })
+
+async function runPasskeyPrfTest() {
+  passkeyTesting.value = true
+  passkeyTestStatus.value = 'idle'
+  passkeyTestMessage.value = ''
+
+  try {
+    const result = await testPasskeyPrf()
+
+    if (result.supported) {
+      passkeyTestStatus.value = 'success'
+      passkeyTestMessage.value = t(
+        'nc_bitwarden',
+        'Success: This browser and security key support WebAuthn PRF. Passkey-based vault unlock can be implemented on this device.',
+      )
+
+      return
+    }
+
+    passkeyTestStatus.value = 'unsupported'
+
+    const messages = {
+      insecure_context: t(
+        'nc_bitwarden',
+        'Passkey testing requires a secure HTTPS connection.',
+      ),
+      webauthn_unavailable: t(
+        'nc_bitwarden',
+        'WebAuthn is not available in this browser.',
+      ),
+      cancelled: t(
+        'nc_bitwarden',
+        'The passkey test was cancelled or timed out.',
+      ),
+      not_supported: t(
+        'nc_bitwarden',
+        'The browser or security key rejected the WebAuthn PRF extension.',
+      ),
+      security_error: t(
+        'nc_bitwarden',
+        'The current origin or browser policy blocks WebAuthn.',
+      ),
+      user_verification_unavailable: t(
+        'nc_bitwarden',
+        'The security key cannot perform the required user verification. Check whether a FIDO2 PIN is configured.',
+      ),
+      authenticator_prf_unavailable: t(
+        'nc_bitwarden',
+        'The selected security key does not support WebAuthn PRF.',
+      ),
+      prf_output_unavailable: t(
+        'nc_bitwarden',
+        'The security key reported PRF support but did not return a usable PRF result.',
+      ),
+      registration_failed: t(
+        'nc_bitwarden',
+        'The temporary passkey credential could not be created.',
+      ),
+    }
+
+    passkeyTestMessage.value
+      = messages[result.reason]
+        ?? t(
+          'nc_bitwarden',
+          'The passkey PRF test was not successful.',
+        )
+  } catch (exception) {
+    passkeyTestStatus.value = 'error'
+    passkeyTestMessage.value = exception.message
+      ?? t(
+        'nc_bitwarden',
+        'The passkey PRF test failed unexpectedly.',
+      )
+
+    console.error(
+      '[nc_bitwarden] Passkey PRF test failed:',
+      exception,
+    )
+  } finally {
+    passkeyTesting.value = false
+  }
+}
 
 async function save() {
   if (urlError.value || emailError.value) {
@@ -358,6 +577,23 @@ async function save() {
   padding-inline: 0 !important;
   background: transparent !important;
   border-radius: 0 !important;
+}
+
+.bw-settings__passkey {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.bw-settings__passkey .notecard {
+  margin-bottom: 0.75rem;
+}
+
+.bw-settings__passkey-hint {
+  margin: 0.75rem 0 0;
+  color: var(--color-text-maxcontrast);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 @media (max-width: 600px) {
