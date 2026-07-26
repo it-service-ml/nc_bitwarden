@@ -175,14 +175,23 @@
       class="bw-settings__passkey"
     >
       <h3>
-        {{ t('nc_bitwarden', 'Passkey vault unlock') }}
+        {{ t('nc_bitwarden', 'Check passkey compatibility') }}
       </h3>
 
       <p class="bw-settings__desc">
         {{
           t(
             'nc_bitwarden',
-            'Test whether this browser and security key support the WebAuthn PRF extension required for passkey-based vault unlock.',
+            'Check whether this browser and security key support the WebAuthn PRF extension required for passkey-based vault unlock. This check does not configure passkey unlock.',
+          )
+        }}
+      </p>
+
+      <p class="bw-settings__desc">
+        {{
+          t(
+            'nc_bitwarden',
+            'Set up passkey vault unlock in Warden settings after unlocking the vault.',
           )
         }}
       </p>
@@ -194,7 +203,7 @@
         {{
           t(
             'nc_bitwarden',
-            'Passkey testing requires a secure HTTPS connection.',
+            'Checking passkey compatibility requires a secure HTTPS connection.',
           )
         }}
       </NcNoteCard>
@@ -270,8 +279,8 @@
 
         {{
           passkeyTesting
-            ? t('nc_bitwarden', 'Testing passkey…')
-            : t('nc_bitwarden', 'Test passkey')
+            ? t('nc_bitwarden', 'Checking compatibility…')
+            : t('nc_bitwarden', 'Check compatibility')
         }}
       </NcButton>
 
@@ -279,7 +288,7 @@
         {{
           t(
             'nc_bitwarden',
-            'The test creates a temporary non-discoverable credential and discards it immediately. No vault key or passkey secret is stored.',
+            'The check creates a temporary non-discoverable credential. Warden does not retain its identifier and cannot reuse it. No vault key or passkey secret is stored.',
           )
         }}
       </p>
@@ -430,7 +439,7 @@ async function runPasskeyPrfTest() {
       passkeyTestStatus.value = 'success'
       passkeyTestMessage.value = t(
         'nc_bitwarden',
-        'Success: This browser and security key support WebAuthn PRF. Passkey-based vault unlock can be implemented on this device.',
+        'Success: This browser and security key support WebAuthn PRF. Passkey-based vault unlock can be used on this device.',
       )
 
       return
@@ -441,7 +450,7 @@ async function runPasskeyPrfTest() {
     const messages = {
       insecure_context: t(
         'nc_bitwarden',
-        'Passkey testing requires a secure HTTPS connection.',
+        'Checking passkey compatibility requires a secure HTTPS connection.',
       ),
       webauthn_unavailable: t(
         'nc_bitwarden',
@@ -449,7 +458,7 @@ async function runPasskeyPrfTest() {
       ),
       cancelled: t(
         'nc_bitwarden',
-        'The passkey test was cancelled or timed out.',
+        'The compatibility check was cancelled or timed out.',
       ),
       not_supported: t(
         'nc_bitwarden',
@@ -481,14 +490,14 @@ async function runPasskeyPrfTest() {
       = messages[result.reason]
         ?? t(
           'nc_bitwarden',
-          'The passkey PRF test was not successful.',
+          'The passkey compatibility check was not successful.',
         )
   } catch (exception) {
     passkeyTestStatus.value = 'error'
     passkeyTestMessage.value = exception.message
       ?? t(
         'nc_bitwarden',
-        'The passkey PRF test failed unexpectedly.',
+        'The passkey compatibility check failed unexpectedly.',
       )
 
     console.error(
