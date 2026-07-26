@@ -134,6 +134,7 @@ Administrators can configure:
 - Self-hosted provider URL
 - Whether users may override the provider
 - Login and SSO behavior
+- Browser-tab unlock policy
 - Whether passkey-based vault unlock is available
 - Maximum attachment size
 - Organization notices and support information
@@ -147,6 +148,7 @@ Users can configure, where permitted:
 - Default item type
 - Password-generator defaults
 - Passphrase-generator defaults
+- Whether Warden stays unlocked in the current browser tab, when permitted
 
 ## Security model
 
@@ -196,13 +198,17 @@ survives page reloads in the same tab but is removed when Warden logs out or
 the tab session ends. Scripts running in the same Nextcloud origin could access
 that storage, so the security of the complete Nextcloud origin is relevant.
 
+Tab-scoped unlock does not store a local copy of vault items and is not an
+offline cache. Warden does not currently offer persistent local vault storage.
+
 ### Clipboard behavior
 
 Warden copies values only after a direct user action.
 
-Warden does not attempt to clear the system clipboard automatically after a
-delay. Browsers block delayed clipboard access when the Warden tab is no longer
-focused, which would make such a security option unreliable.
+Warden does not offer automatic delayed clearing of the system clipboard.
+Browser clipboard APIs commonly require a focused document and a direct user
+action. A background timer therefore cannot guarantee that copied data will be
+removed, which would make such a security option unreliable and misleading.
 
 Users should treat copied passwords, TOTP codes and private keys as sensitive
 clipboard data.
@@ -210,6 +216,12 @@ clipboard data.
 ### No offline cache
 
 Warden does not maintain a persistent offline copy of the decrypted vault.
+There is currently no user option to store vault contents locally for offline
+access.
+
+A future local or offline cache would require a separate security design,
+encryption at rest, explicit user opt-in, an administrator policy and a
+reliable way to remove all locally stored vault data.
 
 ## Authentication modes
 
@@ -265,6 +277,16 @@ Re-enabling the policy restores access to the existing configuration.
 Classic login still requires the master password because Vaultwarden does not
 currently provide Warden with a native passkey-only classic authentication
 flow.
+
+### Native passkey login
+
+Native passkey-based login to Warden is distinct from passkey-based vault
+unlock and is not currently available.
+
+Warden can implement a native passkey login cleanly only when a future
+Vaultwarden version provides a compatible and stable passkey authentication
+flow for third-party clients. Until then, Vaultwarden OIDC SSO authenticates
+the user and Warden's WebAuthn-PRF integration unlocks the encrypted vault.
 
 ## Requirements
 
@@ -484,16 +506,18 @@ Warden does not currently provide:
 
 - Browser autofill
 - Bitwarden Send
-- Persistent offline vault access
+- Persistent offline vault access or a user-selectable local vault cache
 - WebAuthn or hardware-key handling in the classic two-step login form
-- Passkey-based login to Warden
-- Passkey-based vault unlock
-- Guaranteed delayed clearing of the operating-system clipboard
+- Native passkey-based login to Warden, which depends on compatible support in
+  a future Vaultwarden version
+- Guaranteed delayed clearing of the operating-system clipboard, because
+  browser clipboard restrictions make it unreliable
 - Attachment uploads requiring an external or indirect upload flow
 - Private IP addresses and common private hostname suffixes for self-hosted providers
 
-Stored passkey credentials in vault entries are separate from using a passkey
-to authenticate to Warden.
+Stored passkey credentials in vault entries, native passkey login and
+WebAuthn-PRF vault unlock are three separate features. Passkey-based vault
+unlock following Vaultwarden OIDC SSO is supported by Warden.
 
 ## Release checks
 
