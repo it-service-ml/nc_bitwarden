@@ -69,6 +69,11 @@ final class AdminSettingsController extends Controller {
 				);
 			}
 
+			$passkeyUnlockEnabled = $this->booleanParam(
+				'passkey_unlock_enabled',
+				false,
+			);
+
 			$tabUnlockMode = (string)$this->request->getParam(
 				'tab_unlock_mode',
 				'user_choice',
@@ -147,6 +152,7 @@ final class AdminSettingsController extends Controller {
 				$allowUserOverride,
 				$ssoEnabled,
 				$classicLoginAllowed,
+				$passkeyUnlockEnabled,
 				$tabUnlockMode,
 				$tabUnlockDefault,
 				$ssoPasswordMinLength,

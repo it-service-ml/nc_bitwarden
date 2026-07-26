@@ -90,6 +90,35 @@
         </div>
       </template>
 
+      <NcButton
+        v-if="showPasskeyUnlock"
+        variant="primary"
+        :disabled="loading || passkeyUnlockLoading"
+        wide
+        class="bw-login__passkey-action"
+        @click="unlockSsoResultWithPasskey"
+      >
+        <template #icon>
+          <NcLoadingIcon
+            v-if="passkeyUnlockLoading"
+            :size="20"
+          />
+        </template>
+
+        {{
+          passkeyUnlockLoading
+            ? t('nc_bitwarden', 'Unlocking with passkey…')
+            : t('nc_bitwarden', 'Unlock with passkey')
+        }}
+      </NcButton>
+
+      <p
+        v-if="showPasskeyUnlock"
+        class="bw-login__unlock-separator"
+      >
+        {{ t('nc_bitwarden', 'Use master password instead') }}
+      </p>
+
       <div
         v-if="showMasterPasswordSection"
         class="bw-login__field"
@@ -239,7 +268,7 @@
       </small>
 
       <NcButton
-        variant="primary"
+        :variant="showPasskeyUnlock ? 'secondary' : 'primary'"
         :disabled="primaryDisabled"
         wide
         class="bw-login__primary-action"
@@ -319,6 +348,9 @@ import {
   generateUserSymmetricKey,
   makeMasterPasswordHash,
 } from '../services/crypto.js'
+import {
+  unlockUserKeyWithPasskey,
+} from '../services/passkeyPrf.js'
 
 const emit = defineEmits(['logged-in'])
 
@@ -380,7 +412,12 @@ const loading = ref(false)
 const error = ref('')
 const info = ref('')
 
+const passkeyUnlockConfig = ref(null)
+const passkeyUnlockLoading = ref(false)
+const passkeyUnlockEnabled = ref(false)
+
 const serverType = ref('')
+const customUrl = ref('')
 const ssoEnabled = ref(false)
 const classicLoginAllowed = ref(true)
 const classicMode = ref(true)
@@ -438,6 +475,13 @@ const showMasterPasswordSection = computed(() => (
   classicMode.value
   || masterPasswordSetupRequired.value
   || pendingSsoResult.value !== null
+))
+
+const showPasskeyUnlock = computed(() => (
+  !classicMode.value
+  && pendingSsoResult.value !== null
+  && !masterPasswordSetupRequired.value
+  && passkeyUnlockConfig.value !== null
 ))
 
 const showSsoStartHint = computed(() => (
@@ -564,7 +608,10 @@ onMounted(async () => {
     const settings = settingsResult.value ?? {}
 
     serverType.value = settings.server_type ?? ''
+    customUrl.value = settings.custom_url ?? ''
     ssoEnabled.value = settings.sso_enabled === true
+    passkeyUnlockEnabled.value
+      = settings.passkey_unlock_enabled === true
     classicLoginAllowed.value
       = settings.classic_login_allowed !== false
 
@@ -805,6 +852,31 @@ async function completeSsoTwoFactor() {
   }
 }
 
+async function loadPasskeyUnlockConfig() {
+  passkeyUnlockConfig.value = null
+
+  if (!passkeyUnlockEnabled.value) {
+    return
+  }
+
+  try {
+    const config
+      = await VaultwardenApi.getPasskeyUnlockConfig()
+
+    if (
+      config.enabled === true
+      && config.configured === true
+    ) {
+      passkeyUnlockConfig.value = config
+    }
+  } catch (exception) {
+    console.warn(
+      '[nc_bitwarden] Passkey unlock configuration could not be loaded:',
+      exception,
+    )
+  }
+}
+
 async function loadSsoResult() {
   loading.value = true
 
@@ -828,15 +900,22 @@ async function loadSsoResult() {
       return
     }
 
+    await loadPasskeyUnlockConfig()
+
     if (masterPassword.value) {
       await unlockSsoResult()
       return
     }
 
-    info.value = t(
-      'nc_bitwarden',
-      'SSO login was successful. Enter your master password to unlock the vault.',
-    )
+    info.value = passkeyUnlockConfig.value
+      ? t(
+          'nc_bitwarden',
+          'Passkey unlock is available. Use your security key or enter the master password.',
+        )
+      : t(
+          'nc_bitwarden',
+          'SSO login was successful. Enter your master password to unlock the vault.',
+        )
   } catch (exception) {
     error.value = exception.response?.data?.error
       ?? exception.message
@@ -943,6 +1022,113 @@ async function createInitialMasterPassword() {
       exception,
     )
   } finally {
+    loading.value = false
+  }
+}
+
+async function unlockSsoResultWithPasskey() {
+  if (
+    !pendingSsoResult.value
+    || !passkeyUnlockConfig.value
+  ) {
+    return
+  }
+
+  error.value = ''
+  info.value = ''
+  loading.value = true
+  passkeyUnlockLoading.value = true
+
+  try {
+    const result = pendingSsoResult.value
+    const ssoEmail = result.email?.trim() ?? ''
+
+    if (!ssoEmail) {
+      throw new Error(
+        t(
+          'nc_bitwarden',
+          'Vaultwarden did not return an email address.',
+        ),
+      )
+    }
+
+    const currentConfig
+      = await VaultwardenApi.getPasskeyUnlockConfig()
+
+    if (
+      currentConfig.enabled !== true
+      || currentConfig.configured !== true
+    ) {
+      const disabledError = new Error(
+        t(
+          'nc_bitwarden',
+          'Passkey vault unlock is disabled by the administrator.',
+        ),
+      )
+
+      disabledError.code = 'feature_disabled'
+      throw disabledError
+    }
+
+    passkeyUnlockConfig.value = currentConfig
+
+    const userKey = await unlockUserKeyWithPasskey(
+      currentConfig,
+      {
+        email: ssoEmail,
+        serverType: serverType.value,
+        customUrl: customUrl.value,
+      },
+    )
+
+    pendingSsoResult.value = null
+    masterPassword.value = ''
+
+    emit('logged-in', {
+      masterKey: userKey,
+      keepUnlocked: effectiveKeepUnlocked.value,
+    })
+  } catch (exception) {
+    const messages = {
+      cancelled: t(
+        'nc_bitwarden',
+        'The passkey operation was cancelled or timed out.',
+      ),
+      account_mismatch: t(
+        'nc_bitwarden',
+        'The configured passkey does not belong to this vault account.',
+      ),
+      prf_output_unavailable: t(
+        'nc_bitwarden',
+        'The security key did not return a usable PRF result.',
+      ),
+      decrypt_failed: t(
+        'nc_bitwarden',
+        'The encrypted passkey key could not be decrypted.',
+      ),
+      invalid_config: t(
+        'nc_bitwarden',
+        'The saved passkey configuration is invalid.',
+      ),
+      feature_disabled: t(
+        'nc_bitwarden',
+        'Passkey vault unlock is disabled by the administrator.',
+      ),
+    }
+
+    error.value = messages[exception.code]
+      ?? exception.message
+      ?? t(
+        'nc_bitwarden',
+        'Passkey unlock failed.',
+      )
+
+    console.error(
+      '[nc_bitwarden] SSO passkey unlock failed:',
+      exception,
+    )
+  } finally {
+    passkeyUnlockLoading.value = false
     loading.value = false
   }
 }
@@ -1288,6 +1474,17 @@ async function deriveMasterKey(
   flex: 0 0 auto;
   margin-top: 0.1rem;
 }
+.bw-login__passkey-action {
+  margin-bottom: 0.65rem;
+}
+
+.bw-login__unlock-separator {
+  margin: 0.2rem 0 0.8rem;
+  color: var(--color-text-maxcontrast);
+  text-align: center;
+  font-size: 0.85rem;
+}
+
 /* START master password loss warning */
 .bw-login__card {
   max-width: 500px;

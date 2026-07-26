@@ -2,6 +2,52 @@
 
 All notable changes to Warden are documented in this file.
 
+## 2.1.0 - 2026-07-26
+
+Version 2.1.0 adds administrator-controlled passkey-based vault unlock after
+Vaultwarden OIDC single sign-on.
+
+### Added
+
+- WebAuthn-PRF capability test for compatible browsers and security keys
+- Security-key enrollment from an unlocked Warden vault
+- Passkey-based vault unlock following successful OIDC SSO
+- Replacement and removal of the configured security key
+- Administrator policy for enabling passkey-based vault unlock
+- Master-password fallback and recovery path
+
+### Security
+
+- Passkey unlock is disabled by default
+- Enrollment and unlock are permitted only when enabled by an administrator
+- The WebAuthn PRF result remains exclusively in the browser
+- The 64-byte Vaultwarden user key is wrapped using AES-256-GCM
+- The wrapping key is derived using WebAuthn PRF and HKDF-SHA256
+- Credential and account metadata are authenticated as AES-GCM additional data
+- The configuration is bound to the selected provider and normalized account
+  email address
+- Nextcloud stores only the encrypted user key, credential identifier and
+  public wrapping metadata
+- Existing encrypted configurations remain stored while the administrator
+  disables the feature
+
+### Current scope
+
+- Passkey unlock is available after Vaultwarden OIDC SSO
+- Classic login remains dependent on the master password
+- One passkey-unlock credential is supported per Nextcloud user
+- Replacing the security key invalidates the previous configuration
+- The master password remains the fallback and recovery method
+
+### Validation
+
+- WebAuthn PRF was tested successfully with a physical security key
+- Security-key enrollment was tested from an unlocked vault
+- Logout, OIDC SSO and passkey-based unlock were tested successfully
+- Personal vault, organization vault and collection decryption were verified
+- Administrator enable and disable behavior requires final regression testing
+- ESLint, production build and PHP syntax checks passed
+
 ## 2.0.2 - 2026-07-25
 
 Version 2.0.2 hardens provider network access and refreshes the JavaScript

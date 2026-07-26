@@ -2,7 +2,7 @@
 
 > Native Bitwarden and Vaultwarden integration for Nextcloud
 
-![Version](https://img.shields.io/badge/Version-2.0.1-blue)
+![Version](https://img.shields.io/badge/Version-2.1.0-blue)
 ![Nextcloud](https://img.shields.io/badge/Nextcloud-31--34-0082C9?logo=nextcloud&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green)
@@ -11,9 +11,10 @@ Warden provides access to Bitwarden and Vaultwarden vaults directly inside
 Nextcloud.
 
 It supports classic master-password authentication, Vaultwarden TOTP login,
-OIDC single sign-on, personal and organization vaults, encrypted attachments,
-collections, folders, passkey-aware login entries, SSH keys, password
-generation, bulk operations and trash management.
+OIDC single sign-on, administrator-controlled WebAuthn-PRF passkey vault
+unlock, personal and organization vaults, encrypted attachments, collections,
+folders, passkey-aware login entries, SSH keys, password generation, bulk
+operations and trash management.
 
 Vault cryptography is performed in the browser. The master password and
 decrypted vault contents are not sent to Nextcloud.
@@ -43,6 +44,10 @@ rejected.
 - OIDC single sign-on for self-hosted Vaultwarden servers
 - Optional SSO-only operation
 - First-login master-password setup for SSO accounts when required
+- Administrator-controlled passkey vault unlock after SSO
+- WebAuthn-PRF hardware security-key enrollment
+- Security-key replacement and removal
+- Master-password fallback and recovery
 - Tab-scoped vault unlock
 - Provider configuration by administrators
 - Optional per-user provider overrides
@@ -129,6 +134,7 @@ Administrators can configure:
 - Self-hosted provider URL
 - Whether users may override the provider
 - Login and SSO behavior
+- Whether passkey-based vault unlock is available
 - Maximum attachment size
 - Organization notices and support information
 
@@ -170,6 +176,8 @@ The implementation includes:
 - RSA-OAEP organization-key decryption
 - Client-side cipher re-encryption
 - Client-side attachment encryption and decryption
+- WebAuthn PRF and HKDF-SHA256 key derivation for passkey unlock
+- AES-256-GCM wrapping of the Vaultwarden user key
 - Provider access tokens stored in the server-side PHP session
 
 The master password itself is not sent to the Nextcloud server. Classic login
@@ -222,9 +230,11 @@ start and complete the provider login directly from Nextcloud. Warden does not
 currently implement SSO for Bitwarden Cloud or generic self-hosted Bitwarden
 servers.
 
-SSO authenticates the user but does not bypass vault encryption. Depending on
-the provider and account state, a master password may still be required to
-unlock or initialize the encrypted vault.
+SSO authenticates the user but does not bypass vault encryption. A master
+password is required to initialize the encrypted vault and remains available
+as the recovery method. When an administrator enables passkey unlock and a
+compatible WebAuthn-PRF security key has been enrolled, Warden can use that
+security key to unlock the vault following successful SSO.
 
 When the server reports that an SSO account does not yet have a master
 password, Warden can guide the user through the initial setup.
@@ -233,13 +243,36 @@ An administrator may configure SSO-only operation to prevent use of the
 classic login form inside Warden. This does not disable classic authentication
 on the Vaultwarden server itself or in other Bitwarden-compatible clients.
 
+### Passkey vault unlock
+
+Passkey vault unlock is currently available after Vaultwarden OIDC SSO and is
+disabled by default. An administrator must enable it in the Warden
+administration settings before users can test, enroll or use a security key.
+
+The browser and security key must support WebAuthn PRF and user verification,
+normally through a FIDO2 PIN and physical touch.
+
+During enrollment, Warden wraps the decrypted 64-byte Vaultwarden user key
+with an AES-256-GCM key derived locally from the WebAuthn PRF result using
+HKDF-SHA256. The PRF result, plaintext user key and master password are not
+stored by the Nextcloud server.
+
+The server stores the credential identifier, random derivation metadata,
+account binding and encrypted user key. Disabling the administrator policy
+prevents enrollment and unlock but preserves the encrypted configuration.
+Re-enabling the policy restores access to the existing configuration.
+
+Classic login still requires the master password because Vaultwarden does not
+currently provide Warden with a native passkey-only classic authentication
+flow.
+
 ## Requirements
 
 | Component | Requirement |
 |---|---|
 | Nextcloud | 31, 32, 33 or 34 |
 | PHP | 8.1 or newer |
-| Browser | Current Chromium, Firefox or Safari with Web Crypto support |
+| Browser | Current browser with Web Crypto; WebAuthn PRF is required for passkey vault unlock |
 | HTTPS | Required for production operation |
 | Node.js | Required only when building from source |
 | npm | Required only when building from source |
@@ -252,7 +285,7 @@ Extract the application into the Nextcloud application directory:
 
 ```bash
 cd /var/www/html/custom_apps
-tar -xzf nc_bitwarden-2.0.1.tar.gz
+tar -xzf nc_bitwarden-v2.1.0.tar.gz
 chown -R www-data:www-data nc_bitwarden
 ```
 

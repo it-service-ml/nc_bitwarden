@@ -75,6 +75,51 @@
         </NcNoteCard>
 
         <NcCheckboxRadioSwitch
+          v-model="form.passkey_unlock_enabled"
+          class="bw-settings__compact-switch"
+          type="switch"
+          :disabled="
+            loading
+              || saving
+              || form.server_type !== 'selfhosted'
+              || !form.sso_enabled
+          "
+          :description="
+            t(
+              'nc_bitwarden',
+              'Users may enroll a compatible security key and unlock the vault after SSO without entering the master password.',
+            )
+          "
+        >
+          {{
+            t(
+              'nc_bitwarden',
+              'Allow passkey-based vault unlock',
+            )
+          }}
+        </NcCheckboxRadioSwitch>
+
+        <NcNoteCard type="info">
+          <p>
+            {{
+              t(
+                'nc_bitwarden',
+                'Passkey vault unlock requires self-hosted Vaultwarden SSO.',
+              )
+            }}
+          </p>
+
+          <p>
+            {{
+              t(
+                'nc_bitwarden',
+                'Existing passkey configurations remain stored while this option is disabled.',
+              )
+            }}
+          </p>
+        </NcNoteCard>
+
+        <NcCheckboxRadioSwitch
           v-model="form.classic_login_allowed"
           class="bw-settings__compact-switch"
           type="switch"
@@ -435,6 +480,7 @@ function defaultSettings() {
     allow_user_override: true,
     sso_enabled: false,
     classic_login_allowed: true,
+    passkey_unlock_enabled: false,
     tab_unlock_mode: 'user_choice',
     tab_unlock_default: true,
     sso_password_min_length: 12,
@@ -531,6 +577,13 @@ const supportEmailError = computed(() => {
 watch(() => form.sso_enabled, (enabled) => {
   if (!enabled) {
     form.classic_login_allowed = true
+    form.passkey_unlock_enabled = false
+  }
+})
+
+watch(() => form.server_type, (serverType) => {
+  if (serverType !== 'selfhosted') {
+    form.passkey_unlock_enabled = false
   }
 })
 
@@ -547,6 +600,8 @@ onMounted(async () => {
       ...defaultSettings(),
       ...settings,
       classic_login_allowed: settings.classic_login_allowed !== false,
+      passkey_unlock_enabled:
+        settings.passkey_unlock_enabled === true,
       tab_unlock_mode: [
         'forced_enabled',
         'forced_disabled',
@@ -583,15 +638,18 @@ function payloadForSection(section) {
       allow_user_override: form.allow_user_override,
       sso_enabled: form.sso_enabled,
       classic_login_allowed: form.classic_login_allowed,
+      passkey_unlock_enabled: form.passkey_unlock_enabled,
       tab_unlock_mode: form.tab_unlock_mode,
       tab_unlock_default: form.tab_unlock_default,
     })
 
     if (payload.server_type !== 'selfhosted') {
       payload.sso_enabled = false
+      payload.passkey_unlock_enabled = false
     }
     if (!payload.sso_enabled) {
       payload.classic_login_allowed = true
+      payload.passkey_unlock_enabled = false
     }
     if (!payload.classic_login_allowed) {
       payload.allow_user_override = false
@@ -665,6 +723,8 @@ async function save(section) {
         allow_user_override: payload.allow_user_override,
         sso_enabled: payload.sso_enabled,
         classic_login_allowed: payload.classic_login_allowed,
+        passkey_unlock_enabled:
+          payload.passkey_unlock_enabled,
         tab_unlock_mode: payload.tab_unlock_mode,
         tab_unlock_default: payload.tab_unlock_default,
       })

@@ -74,6 +74,131 @@
             }}
           </NcButton>
         </div>
+
+        <div
+          v-if="passkeyFeatureEnabled"
+          class="bw-warden-settings__passkey-unlock"
+        >
+          <h4>
+            {{ t('nc_bitwarden', 'Passkey vault unlock') }}
+          </h4>
+
+          <p>
+            {{
+              t(
+                'nc_bitwarden',
+                'Use a security key to unlock this vault after SSO without entering the master password.',
+              )
+            }}
+          </p>
+
+          <NcNoteCard type="info">
+            {{
+              t(
+                'nc_bitwarden',
+                'The server stores only the encrypted user key, the credential identifier, and public wrapping metadata. The PRF output is never stored.',
+              )
+            }}
+          </NcNoteCard>
+
+          <NcNoteCard
+            v-if="passkeySuccess"
+            type="success"
+          >
+            {{ passkeySuccess }}
+          </NcNoteCard>
+
+          <NcNoteCard
+            v-if="passkeyError"
+            type="error"
+          >
+            {{ passkeyError }}
+          </NcNoteCard>
+
+          <NcNoteCard
+            v-if="passkeyStatus.invalid"
+            type="warning"
+          >
+            {{
+              t(
+                'nc_bitwarden',
+                'The saved passkey configuration is invalid and should be replaced.',
+              )
+            }}
+          </NcNoteCard>
+
+          <p
+            v-if="passkeyStatus.configured"
+            class="bw-warden-settings__passkey-status"
+          >
+            <strong>
+              {{
+                t(
+                  'nc_bitwarden',
+                  'Passkey unlock is configured.',
+                )
+              }}
+            </strong>
+
+            <span v-if="passkeyConfiguredDate">
+              {{
+                t(
+                  'nc_bitwarden',
+                  'Configured on {date}',
+                  {
+                    date: passkeyConfiguredDate,
+                  },
+                )
+              }}
+            </span>
+          </p>
+
+          <div class="bw-warden-settings__passkey-actions">
+            <NcButton
+              variant="secondary"
+              :disabled="passkeyBusy"
+              @click="enrollPasskeyUnlock"
+            >
+              <template #icon>
+                <NcLoadingIcon
+                  v-if="passkeyAction === 'enroll'"
+                  :size="20"
+                />
+              </template>
+
+              {{
+                passkeyAction === 'enroll'
+                  ? t('nc_bitwarden', 'Setting up passkey…')
+                  : passkeyStatus.configured
+                    ? t('nc_bitwarden', 'Replace security key')
+                    : t('nc_bitwarden', 'Set up security key')
+              }}
+            </NcButton>
+
+            <NcButton
+              v-if="passkeyStatus.configured"
+              variant="secondary"
+              :disabled="passkeyBusy"
+              @click="removePasskeyUnlock"
+            >
+              <template #icon>
+                <NcLoadingIcon
+                  v-if="passkeyAction === 'remove'"
+                  :size="20"
+                />
+              </template>
+
+              {{
+                passkeyAction === 'remove'
+                  ? t('nc_bitwarden', 'Removing…')
+                  : t(
+                    'nc_bitwarden',
+                    'Remove passkey unlock',
+                  )
+              }}
+            </NcButton>
+          </div>
+        </div>
       </section>
 
       <section class="bw-warden-settings__section">
@@ -482,6 +607,7 @@
 <script setup>
 import {
   computed,
+  onMounted,
   reactive,
   ref,
   watch,
@@ -490,6 +616,7 @@ import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcDialog from '@nextcloud/vue/components/NcDialog'
+import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
 import NcPasswordField from '@nextcloud/vue/components/NcPasswordField'
 import { VaultwardenApi } from '../services/api.js'
@@ -501,6 +628,9 @@ import {
   makeMasterPasswordHash,
 } from '../services/crypto.js'
 import { normalizeUserPreferences } from '../services/userPreferences.js'
+import {
+  createPasskeyUnlockConfig,
+} from '../services/passkeyPrf.js'
 
 const props = defineProps({
   preferences: {
@@ -544,6 +674,47 @@ const newMasterPassword = ref('')
 const confirmMasterPassword = ref('')
 const changingPassword = ref(false)
 const passwordError = ref('')
+
+const passkeyFeatureEnabled = ref(false)
+
+const passkeyStatus = ref({
+  configured: false,
+  invalid: false,
+})
+
+const passkeyAction = ref('')
+const passkeySuccess = ref('')
+const passkeyError = ref('')
+
+const passkeyBusy = computed(() => (
+  passkeyAction.value !== ''
+))
+
+const passkeyConfiguredDate = computed(() => {
+  const value = passkeyStatus.value.created_at
+
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat(
+    undefined,
+    {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    },
+  ).format(date)
+})
+
+onMounted(async () => {
+  await loadPasskeyUnlockFeature()
+})
 
 watch(
   () => props.preferences,
@@ -752,6 +923,140 @@ async function deriveMasterKey(password) {
     email,
     iterations,
   )
+}
+
+async function loadPasskeyUnlockFeature() {
+  try {
+    const settings = await VaultwardenApi.getSettings()
+
+    passkeyFeatureEnabled.value
+      = settings.passkey_unlock_enabled === true
+
+    if (passkeyFeatureEnabled.value) {
+      await loadPasskeyUnlockStatus()
+    }
+  } catch (exception) {
+    passkeyError.value = exception.response?.data?.error
+      ?? exception.message
+      ?? t(
+        'nc_bitwarden',
+        'The passkey configuration could not be loaded.',
+      )
+  }
+}
+
+async function loadPasskeyUnlockStatus() {
+  try {
+    passkeyStatus.value
+      = await VaultwardenApi.getPasskeyUnlockConfig()
+  } catch (exception) {
+    passkeyError.value = exception.response?.data?.error
+      ?? exception.message
+      ?? t(
+        'nc_bitwarden',
+        'The passkey configuration could not be loaded.',
+      )
+  }
+}
+
+async function enrollPasskeyUnlock() {
+  passkeyAction.value = 'enroll'
+  passkeySuccess.value = ''
+  passkeyError.value = ''
+
+  try {
+    const email = String(
+      profileValue('Email', 'email') ?? '',
+    ).trim()
+
+    if (!email) {
+      throw new Error(
+        t(
+          'nc_bitwarden',
+          'The vault profile does not contain an email address.',
+        ),
+      )
+    }
+
+    const settings = await VaultwardenApi.getSettings()
+
+    const config = await createPasskeyUnlockConfig(
+      props.userKey,
+      {
+        email,
+        serverType: settings.server_type,
+        customUrl: settings.custom_url,
+      },
+    )
+
+    passkeyStatus.value
+      = await VaultwardenApi
+        .savePasskeyUnlockConfig(config)
+
+    passkeySuccess.value = t(
+      'nc_bitwarden',
+      'Passkey unlock was configured successfully.',
+    )
+  } catch (exception) {
+    const messages = {
+      cancelled: t(
+        'nc_bitwarden',
+        'The passkey operation was cancelled or timed out.',
+      ),
+      authenticator_prf_unavailable: t(
+        'nc_bitwarden',
+        'The selected security key does not support WebAuthn PRF.',
+      ),
+      prf_output_unavailable: t(
+        'nc_bitwarden',
+        'The security key did not return a usable PRF result.',
+      ),
+      user_verification_unavailable: t(
+        'nc_bitwarden',
+        'The security key cannot perform the required user verification. Check whether a FIDO2 PIN is configured.',
+      ),
+    }
+
+    passkeyError.value
+      = messages[exception.code]
+        ?? exception.response?.data?.error
+        ?? exception.message
+        ?? t(
+          'nc_bitwarden',
+          'Passkey unlock could not be configured.',
+        )
+  } finally {
+    passkeyAction.value = ''
+  }
+}
+
+async function removePasskeyUnlock() {
+  passkeyAction.value = 'remove'
+  passkeySuccess.value = ''
+  passkeyError.value = ''
+
+  try {
+    await VaultwardenApi.deletePasskeyUnlockConfig()
+
+    passkeyStatus.value = {
+      configured: false,
+      invalid: false,
+    }
+
+    passkeySuccess.value = t(
+      'nc_bitwarden',
+      'Passkey unlock was removed.',
+    )
+  } catch (exception) {
+    passkeyError.value = exception.response?.data?.error
+      ?? exception.message
+      ?? t(
+        'nc_bitwarden',
+        'Passkey unlock could not be removed.',
+      )
+  } finally {
+    passkeyAction.value = ''
+  }
 }
 
 async function savePreferences() {
@@ -992,4 +1297,27 @@ async function changeMasterPassword() {
     max-height: 75vh;
   }
 }
+
+.bw-warden-settings__passkey-unlock {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.bw-warden-settings__passkey-unlock > p {
+  color: var(--color-text-maxcontrast);
+}
+
+.bw-warden-settings__passkey-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bw-warden-settings__passkey-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 </style>

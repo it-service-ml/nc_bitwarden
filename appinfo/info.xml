@@ -8,9 +8,10 @@
         Access Bitwarden and Vaultwarden vaults directly from Nextcloud.
 
         Warden supports classic master-password authentication, Vaultwarden
-        TOTP, OIDC single sign-on, personal and organization vaults,
-        collections, folders, encrypted attachments, passkey-aware login
-        entries, SSH keys, password generation, bulk operations and trash.
+        TOTP, OIDC single sign-on, WebAuthn-PRF passkey vault unlock,
+        personal and organization vaults, collections, folders, encrypted
+        attachments, passkey-aware login entries, SSH keys, password
+        generation, bulk operations and trash.
 
         Bitwarden Cloud US, Bitwarden Cloud EU and compatible self-hosted
         Bitwarden or Vaultwarden servers are supported.
@@ -19,7 +20,7 @@
         browser. The master password and plaintext vault contents are not
         transmitted to the Nextcloud server.
     ]]></description>
-    <version>2.0.2</version>
+    <version>2.1.0</version>
     <licence>agpl</licence>
     <author>Christian Thiele / Mission Leben IT</author>
     <author>Philipp Tannich – original author</author>
