@@ -2,6 +2,57 @@
 
 All notable changes to Warden are documented in this file.
 
+## 2.2.0 - 2026-07-27
+
+Version 2.2.0 focuses on safer item editing, permission-aware actions,
+conflict handling and reliable localization. Features already introduced in
+2.0.0 and 2.1.0 remain unchanged in the release history.
+
+### Added
+
+- Standard and advanced interface modes for item details and editing
+- Warning and direct switch when advanced data is hidden in standard mode
+- Duplication of vault items
+- Warning before closing an item with unsaved changes
+- Saving forms with `Ctrl+Enter`
+- Specific feedback when an item was changed in another client
+- Strict localization audit for missing, empty or invalid translations
+
+### Changed
+
+- Item editing preserves hidden and type-specific data, including multiple
+  URLs, custom and linked fields, attachments, passkey metadata, password
+  history, reprompt settings and SSH-key data
+- Item-type changes preserve existing data and reject unsafe conversions
+- Organization and collection selection is restricted to valid writable
+  targets
+- Known read-only, deletion and restricted-password permission flags are
+  honored consistently by the interface and save paths
+- Inline note editing, attachment feedback and SSH-key error handling were
+  improved
+- German terminology and visible interface translations were completed and
+  standardized
+
+### Fixed
+
+- Saving an item in standard mode no longer discards hidden advanced data
+- Read-only entries can no longer be saved through alternate form paths
+- Invalid organization and collection assignments are rejected before saving
+- Stale item revisions now produce a clear concurrent-edit conflict message
+- German translation catalogs safely escape quotes and other special
+  characters
+- Translation catalogs are generated atomically from the canonical PHP file
+- Missing translations, broken placeholders and dynamic translation keys now
+  fail the localization check
+
+### Quality
+
+- Added reproducible generation of `de.js` and `de.json` from `de.php`
+- Added automated synchronization, syntax and placeholder checks for the
+  German translation catalogs
+- ESLint, localization checks and the production build are part of the
+  verification process
+
 ## 2.1.0 - 2026-07-26
 
 Version 2.1.0 adds administrator-controlled passkey-based vault unlock after

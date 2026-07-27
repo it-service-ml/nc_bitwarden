@@ -7,7 +7,10 @@
   >
     <header class="bw-detail__header">
       <div class="bw-detail__title">
-        <span class="bw-detail__eyebrow">
+        <span
+          v-if="advancedMode"
+          class="bw-detail__eyebrow"
+        >
           {{ t('nc_bitwarden', 'Item') }}
         </span>
 
@@ -37,6 +40,7 @@
       <div class="bw-detail__actions">
         <template v-if="trashMode">
           <NcButton
+            v-if="canRestoreItem"
             :title="
               t(
                 'nc_bitwarden',
@@ -55,6 +59,7 @@
           </NcButton>
 
           <NcButton
+            v-if="advancedMode && canDeleteItem"
             variant="error"
             :title="
               t(
@@ -81,6 +86,10 @@
 
         <template v-else>
           <NcButton
+            v-if="
+              advancedMode
+                && canDuplicateItem
+            "
             :title="
               t(
                 'nc_bitwarden',
@@ -99,6 +108,7 @@
           </NcButton>
 
           <NcButton
+            v-if="canEditItem"
             :title="
               t(
                 'nc_bitwarden',
@@ -117,6 +127,7 @@
           </NcButton>
 
           <NcButton
+            v-if="advancedMode && canDeleteItem"
             variant="error"
             :title="
               t(
@@ -167,7 +178,54 @@
       </span>
     </div>
 
+    <div
+      v-if="!advancedMode && hasHiddenAdvancedData"
+      class="bw-detail__advanced-notice"
+    >
+      <div>
+        <strong>
+          {{ t(
+            'nc_bitwarden',
+            'This item contains advanced data that is hidden in standard view.',
+          ) }}
+        </strong>
+
+        <span>
+          {{ t(
+            'nc_bitwarden',
+            'Switch to advanced view to display or edit all data.',
+          ) }}
+        </span>
+      </div>
+
+      <NcButton
+        class="bw-detail__advanced-notice-action"
+        variant="secondary"
+        :title="
+          t(
+            'nc_bitwarden',
+            'Open advanced view',
+          )
+        "
+        :aria-label="
+          t(
+            'nc_bitwarden',
+            'Open advanced view',
+          )
+        "
+        @click="$emit('request-advanced-mode')"
+      >
+        {{
+          t(
+            'nc_bitwarden',
+            'Show all',
+          )
+        }}
+      </NcButton>
+    </div>
+
     <nav
+      v-if="advancedMode"
       class="bw-detail__tabs"
       aria-label="Eintragsbereiche"
     >
@@ -215,7 +273,11 @@
         v-if="
           activeDetailTab === 'security'
             && Number(item.type) === 1
-            && !item.login?.password
+            && (
+              !canViewPasswordItem
+              || !item.login?.password
+            )
+            && !item.login?.totp
             && !item.login?.fido2Credentials?.length
             && !passwordHistoryEntries.length
         "
@@ -242,15 +304,17 @@
             <FieldRow
               :label="t('nc_bitwarden', 'Password')"
               :value="item.login.password"
-              copyable
+              :copyable="canViewPasswordItem"
+              :reveal-blocked="!canViewPasswordItem"
               secret
             />
 
             <FieldRow
-              v-for="(uri, index) in item.login.uris ?? []"
+              v-for="(uri, index) in visibleItemUris"
               :key="`${uri.uri}-${index}`"
               :label="
-                item.login.uris.length > 1
+                advancedMode
+                  && visibleItemUris.length > 1
                   ? t(
                     'nc_bitwarden',
                     'URL {number}',
@@ -275,7 +339,7 @@
           "
         >
           <div class="bw-detail__group-title">
-            Passkeys
+            {{ t('nc_bitwarden', 'Passkeys') }}
           </div>
 
           <div class="bw-detail__passkeys">
@@ -294,12 +358,20 @@
                 {{
                   credential.rpName
                     || credential.rpId
-                    || 'Passkey'
+                    || t('nc_bitwarden', 'Passkey')
                 }}
               </strong>
 
               <span v-if="credential.rpId">
-                Website: {{ credential.rpId }}
+                {{
+                  t(
+                    'nc_bitwarden',
+                    'Website: {website}',
+                    {
+                      website: credential.rpId,
+                    },
+                  )
+                }}
               </span>
 
               <span
@@ -308,18 +380,29 @@
                     || credential.userName
                 "
               >
-                Benutzer:
                 {{
-                  credential.userDisplayName
-                    || credential.userName
+                  t(
+                    'nc_bitwarden',
+                    'User: {user}',
+                    {
+                      user:
+                        credential.userDisplayName
+                        || credential.userName,
+                    },
+                  )
                 }}
               </span>
 
               <span v-if="credential.creationDate">
-                Erstellt:
                 {{
-                  formatPasskeyDate(
-                    credential.creationDate,
+                  t(
+                    'nc_bitwarden',
+                    'Created: {date}',
+                    {
+                      date: formatPasskeyDate(
+                        credential.creationDate,
+                      ),
+                    },
                   )
                 }}
               </span>
@@ -333,7 +416,10 @@
         />
 
         <section
-          v-if="item.login.password"
+          v-if="
+            canViewPasswordItem
+              && item.login.password
+          "
           class="
             bw-detail__group
             bw-detail__security
@@ -508,7 +594,10 @@
           </p>
         </section>
         <section
-          v-if="passwordHistoryEntries.length"
+          v-if="
+            canViewPasswordItem
+              && passwordHistoryEntries.length
+          "
           class="
             bw-detail__group
             bw-detail__password-history
@@ -591,8 +680,9 @@
                 )
               "
               :value="entry.password"
+              :copyable="canViewPasswordItem"
+              :reveal-blocked="!canViewPasswordItem"
               secret
-              copyable
               wide
             />
           </div>
@@ -854,6 +944,7 @@
 
             <div class="bw-detail__notes-actions">
               <button
+                v-if="canEditItem"
                 type="button"
                 class="bw-detail__notes-edit"
                 :title="
@@ -916,7 +1007,7 @@
       </section>
 
       <section
-        v-if="item.fields?.length"
+        v-if="advancedMode && item.fields?.length"
         class="bw-detail__group"
       >
         <div class="bw-detail__group-title">
@@ -935,18 +1026,28 @@
             :value="customFieldValue(field)"
             :hint="customFieldHint(field)"
             :secret="customFieldIsSecret(field)"
-            :copyable="Number(field.type) !== 2"
+            :reveal-blocked="
+              !canRevealCustomField(field)
+            "
+            :copyable="
+              customFieldIsCopyable(field)
+            "
             compact
           />
         </div>
       </section>
 
       <AttachmentManager
-        v-if="item.id && !trashMode"
+        v-if="
+          advancedMode
+            && item.id
+            && !trashMode
+        "
         class="bw-detail__tab-attachments"
         :item="item"
         :user-key="userKey"
         :organization-keys="organizationKeys"
+        :read-only="!canEditItem"
         @changed="emit('changed', $event.cipherId)"
       />
     </div>
@@ -1003,6 +1104,11 @@ const props = defineProps({
     default: () => [],
   },
 
+  advancedMode: {
+    type: Boolean,
+    required: true,
+  },
+
   trashMode: {
     type: Boolean,
     default: false,
@@ -1016,10 +1122,71 @@ const emit = defineEmits([
   'changed',
   'save-notes',
   'select-related',
+  'request-advanced-mode',
 
   'restore',
   'delete-permanent',
 ])
+
+// Stufe 2O-2/2O-3a: effektive Cipher-Rechte
+function itemIsPersonal(candidate) {
+  return !String(
+    candidate?.organizationId
+    ?? '',
+  ).trim()
+}
+
+function canViewPasswordForItem(candidate) {
+  return itemIsPersonal(candidate)
+    || candidate?.viewPassword === true
+}
+
+function canManageAssignedCollection(candidate) {
+  if (itemIsPersonal(candidate)) {
+    return true
+  }
+
+  const collectionIds =
+    candidate?.collectionIds
+    ?? []
+
+  return collectionIds.some(collectionId =>
+    props.collections.some(collection =>
+      normalizeId(collection.id)
+        === normalizeId(collectionId)
+      && collection.manage === true,
+    ),
+  )
+}
+
+const personalItem = computed(() =>
+  itemIsPersonal(props.item),
+)
+
+const canEditItem = computed(() =>
+  personalItem.value
+    || props.item?.edit === true,
+)
+
+const canViewPasswordItem = computed(() =>
+  canViewPasswordForItem(props.item),
+)
+
+const canDuplicateItem = computed(() =>
+  canEditItem.value
+    && canViewPasswordItem.value
+    && canManageAssignedCollection(props.item),
+)
+
+const canDeleteItem = computed(() =>
+  personalItem.value
+    || props.item?.permissions?.delete === true,
+)
+
+const canRestoreItem = computed(() =>
+  personalItem.value
+    || props.item?.permissions?.restore === true,
+)
 
 const notesMessage = ref('')
 const notesCopied = ref(false)
@@ -1056,6 +1223,10 @@ watch(
 )
 
 function startNotesEdit() {
+  if (!canEditItem.value) {
+    return
+  }
+
   notesDraft.value = String(
     props.item?.notes ?? '',
   )
@@ -1106,6 +1277,11 @@ function showInlineNotesMessage(message) {
 }
 
 function saveNotesInline() {
+  if (!canEditItem.value) {
+    notesEditing.value = false
+    return
+  }
+
   if (notesSaving.value) {
     return
   }
@@ -1166,15 +1342,31 @@ function saveNotesInline() {
 
 const activeDetailTab = ref('details')
 
+watch(
+  () => props.advancedMode,
+  advancedMode => {
+    if (!advancedMode) {
+      activeDetailTab.value = 'details'
+    }
+  },
+  {
+    immediate: true,
+  },
+)
+
 const passwordHistoryExpanded = ref(false)
 
-const passwordHistoryEntries = computed(() =>
-  Array.isArray(props.item?.passwordHistory)
+const passwordHistoryEntries = computed(() => {
+  if (!canViewPasswordItem.value) {
+    return []
+  }
+
+  return Array.isArray(props.item?.passwordHistory)
     ? props.item.passwordHistory.filter(
       entry => Boolean(entry?.password),
     )
-    : [],
-)
+    : []
+})
 
 watch(
   () => props.item?.id,
@@ -1230,6 +1422,42 @@ watch(
 const itemName = computed(() =>
   props.item.name || t('nc_bitwarden', '(no name)'),
 )
+
+const visibleItemUris = computed(() => {
+  const uris = props.item.login?.uris ?? []
+
+  return props.advancedMode
+    ? uris
+    : uris.slice(0, 1)
+})
+
+const hasHiddenAdvancedData = computed(() => (
+  Boolean(
+    props.item.login
+      ?.fido2Credentials
+      ?.length,
+  )
+  || Boolean(
+    props.item.attachments?.length,
+  )
+  || Boolean(
+    props.item.fields?.length,
+  )
+  || Boolean(
+    props.item.passwordHistory?.length,
+  )
+  || (
+    props.item.login?.uris
+    ?? []
+  ).length > 1
+  || (
+    props.item.login?.uris
+    ?? []
+  ).some(uri =>
+    uri?.match !== null
+      && uri?.match !== undefined,
+  )
+))
 
 const itemTypeLabel = computed(() => ({
   1: t('nc_bitwarden', 'Login'),
@@ -1379,9 +1607,11 @@ const notesGroupTitle = computed(() =>
 )
 
 const passwordStrength = computed(() => {
-  const password = String(
-    props.item.login?.password ?? '',
-  )
+  const password = canViewPasswordItem.value
+    ? String(
+      props.item.login?.password ?? '',
+    )
+    : ''
 
   let score = 0
 
@@ -1479,6 +1709,10 @@ const passwordAgeLabel = computed(() => {
 })
 
 const reusedPasswordItems = computed(() => {
+  if (!canViewPasswordItem.value) {
+    return []
+  }
+
   const password = String(
     props.item.login?.password ?? '',
   )
@@ -1491,6 +1725,7 @@ const reusedPasswordItems = computed(() => {
     .filter(candidate =>
       Number(candidate.type) === 1
       && !candidate.deletedDate
+      && canViewPasswordForItem(candidate)
       && String(
         candidate.login?.password ?? '',
       ) === password,
@@ -1623,41 +1858,40 @@ const linkedSecretIds = new Set([
 ])
 
 const linkedFieldLabels = {
-  100: 'Username',
-  101: 'Password',
-  300: 'Cardholder',
-  301: 'Expiration month',
-  302: 'Expiration year',
-  303: 'CVV',
-  304: 'Card brand',
-  305: 'Card number',
-  400: 'Title',
-  401: 'Middle name',
-  402: 'Address line 1',
-  403: 'Address line 2',
-  404: 'Address line 3',
-  405: 'City',
-  406: 'State / region',
-  407: 'Postal code',
-  408: 'Country',
-  409: 'Company',
-  410: 'Email',
-  411: 'Phone',
-  412: 'Social security number',
-  413: 'Username',
-  414: 'Passport number',
-  415: 'License number',
-  416: 'First name',
-  417: 'Last name',
-  418: 'Full name',
+  100: t('nc_bitwarden', 'Username'),
+  101: t('nc_bitwarden', 'Password'),
+  300: t('nc_bitwarden', 'Cardholder'),
+  301: t('nc_bitwarden', 'Expiration month'),
+  302: t('nc_bitwarden', 'Expiration year'),
+  303: t('nc_bitwarden', 'CVV'),
+  304: t('nc_bitwarden', 'Card brand'),
+  305: t('nc_bitwarden', 'Card number'),
+  400: t('nc_bitwarden', 'Title'),
+  401: t('nc_bitwarden', 'Middle name'),
+  402: t('nc_bitwarden', 'Address line 1'),
+  403: t('nc_bitwarden', 'Address line 2'),
+  404: t('nc_bitwarden', 'Address line 3'),
+  405: t('nc_bitwarden', 'City'),
+  406: t('nc_bitwarden', 'State / region'),
+  407: t('nc_bitwarden', 'Postal code'),
+  408: t('nc_bitwarden', 'Country'),
+  409: t('nc_bitwarden', 'Company'),
+  410: t('nc_bitwarden', 'Email'),
+  411: t('nc_bitwarden', 'Phone'),
+  412: t('nc_bitwarden', 'Social security number'),
+  413: t('nc_bitwarden', 'Username'),
+  414: t('nc_bitwarden', 'Passport number'),
+  415: t('nc_bitwarden', 'License number'),
+  416: t('nc_bitwarden', 'First name'),
+  417: t('nc_bitwarden', 'Last name'),
+  418: t('nc_bitwarden', 'Full name'),
 }
 
 function linkedFieldLabel(linkedId) {
   const label = linkedFieldLabels[Number(linkedId)]
 
   return label
-    ? t('nc_bitwarden', label)
-    : t('nc_bitwarden', 'Unavailable linked field')
+    ?? t('nc_bitwarden', 'Unavailable linked field')
 }
 
 function linkedFieldValue(linkedId) {
@@ -1721,6 +1955,21 @@ function customFieldIsSecret(field) {
     )
 }
 
+function canRevealCustomField(field) {
+  return (
+    !customFieldIsSecret(field)
+    || canViewPasswordItem.value
+  )
+}
+
+function customFieldIsCopyable(field) {
+  if (Number(field.type) === 2) {
+    return false
+  }
+
+  return canRevealCustomField(field)
+}
+
 function customFieldHint(field) {
   const type = Number(field.type)
 
@@ -1742,6 +1991,10 @@ function customFieldHint(field) {
 }
 
 function confirmDelete() {
+  if (!canDeleteItem.value) {
+    return
+  }
+
   // Bestätigung und API-Aufruf erfolgen zentral
   // in App.vue.
   emit('delete', props.item)
@@ -2487,6 +2740,90 @@ onBeforeUnmount(() => {
 .bw-detail--trash .bw-detail__notes-editor-actions,
 .bw-detail--trash .bw-detail__tab-attachments {
   display: none !important;
+}
+
+.bw-detail__advanced-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.75rem 1rem 0;
+  padding: 0.8rem 0.9rem;
+  border:
+    1px solid
+    var(--color-border-dark);
+  border-radius:
+    var(--border-radius-large);
+  background:
+    var(--color-background-hover);
+}
+
+.bw-detail__advanced-notice > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.bw-detail__advanced-notice span {
+  color:
+    var(--color-text-maxcontrast);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 680px) {
+  .bw-detail__advanced-notice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* Stage 2D notice layout */
+.bw-detail__advanced-notice {
+  display: grid;
+  grid-template-areas:
+    "title title"
+    "description action";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: 1rem;
+  row-gap: 0.25rem;
+}
+
+.bw-detail__advanced-notice > div {
+  display: contents;
+}
+
+.bw-detail__advanced-notice > div > strong {
+  min-width: 0;
+  grid-area: title;
+}
+
+.bw-detail__advanced-notice > div > span {
+  min-width: 0;
+  grid-area: description;
+}
+
+.bw-detail__advanced-notice-action {
+  grid-area: action;
+  align-self: end;
+  justify-self: end;
+  margin-top: 0.15rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .bw-detail__advanced-notice {
+    grid-template-areas:
+      "title"
+      "description"
+      "action";
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bw-detail__advanced-notice-action {
+    justify-self: start;
+  }
 }
 
 </style>

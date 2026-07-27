@@ -7,11 +7,16 @@
         </div>
 
         <div class="bw-attachments__subtitle">
-          Dateien werden vor dem Upload im Browser verschlüsselt.
+          {{
+            readOnly
+              ? 'Anhänge können heruntergeladen, aber nicht verändert werden.'
+              : 'Dateien werden vor dem Upload im Browser verschlüsselt.'
+          }}
         </div>
       </div>
 
       <NcButton
+        v-if="!readOnly"
         variant="primary"
         :disabled="uploading || !ownerKey"
         @click="openFilePicker"
@@ -24,6 +29,7 @@
       </NcButton>
 
       <input
+        v-if="!readOnly"
         ref="fileInput"
         type="file"
         hidden
@@ -83,6 +89,7 @@
           </NcButton>
 
           <NcButton
+            v-if="!readOnly"
             variant="error"
             :disabled="
               busyAttachmentId === attachment.id
@@ -134,6 +141,12 @@ const props = defineProps({
   organizationKeys: {
     type: Object,
     default: () => ({}),
+  },
+
+  // Stufe 2O-2: schreibgeschützte Anhänge
+  readOnly: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -220,6 +233,10 @@ function emitChanged() {
 }
 
 function openFilePicker() {
+  if (props.readOnly) {
+    return
+  }
+
   error.value = ''
   fileInput.value?.click()
 }
@@ -267,6 +284,10 @@ async function uploadSelectedFile(event) {
 
   if (event.target) {
     event.target.value = ''
+  }
+
+  if (props.readOnly) {
+    return
   }
 
   if (!file || uploading.value) {
@@ -371,6 +392,10 @@ async function downloadAttachment(attachment) {
 }
 
 async function removeAttachment(attachment) {
+  if (props.readOnly) {
+    return
+  }
+
   if (busyAttachmentId.value) {
     return
   }

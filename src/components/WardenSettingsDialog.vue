@@ -206,6 +206,24 @@
 
         <div class="bw-warden-settings__grid">
           <div class="bw-warden-settings__field">
+            <label for="bw-interface-mode">
+              {{ t('nc_bitwarden', 'Interface mode') }}
+            </label>
+
+            <select
+              id="bw-interface-mode"
+              v-model="form.interface_mode"
+            >
+              <option value="standard">
+                {{ t('nc_bitwarden', 'Standard') }}
+              </option>
+              <option value="advanced">
+                {{ t('nc_bitwarden', 'Advanced') }}
+              </option>
+            </select>
+          </div>
+
+          <div class="bw-warden-settings__field">
             <label for="bw-start-category">
               {{ t('nc_bitwarden', 'Start area') }}
             </label>
@@ -255,26 +273,45 @@
               id="bw-navigation-mode"
               v-model="form.navigation_start_mode"
             >
-              <option value="collapsed">
-                {{ t('nc_bitwarden', 'Everything collapsed') }}
+              <option value="last_used">
+                {{ t('nc_bitwarden', 'Like last time') }}
               </option>
-              <option value="personal_expanded">
+              <option value="collapsed">
                 {{
                   t(
                     'nc_bitwarden',
-                    'Categories and folders expanded, collections collapsed',
+                    'Folders and collections collapsed',
+                  )
+                }}
+              </option>
+              <option value="personal_expanded">
+                {{ t('nc_bitwarden', 'Only folders expanded') }}
+              </option>
+              <option value="collections_expanded">
+                {{
+                  t(
+                    'nc_bitwarden',
+                    'Only collections expanded',
                   )
                 }}
               </option>
               <option value="expanded">
-                {{ t('nc_bitwarden', 'Everything expanded') }}
+                {{
+                  t(
+                    'nc_bitwarden',
+                    'Folders and collections expanded',
+                  )
+                }}
               </option>
             </select>
           </div>
         </div>
       </section>
 
-      <section class="bw-warden-settings__section">
+      <section
+        v-if="advancedMode"
+        class="bw-warden-settings__section"
+      >
         <h3>{{ t('nc_bitwarden', 'New items') }}</h3>
 
         <div class="bw-warden-settings__grid">
@@ -388,7 +425,10 @@
         </div>
       </section>
 
-      <section class="bw-warden-settings__section">
+      <section
+        v-if="advancedMode"
+        class="bw-warden-settings__section"
+      >
         <h3>{{ t('nc_bitwarden', 'Password generator') }}</h3>
 
         <div class="bw-warden-settings__field">
@@ -635,6 +675,10 @@ import {
 const props = defineProps({
   preferences: {
     type: Object,
+    required: true,
+  },
+  advancedMode: {
+    type: Boolean,
     required: true,
   },
   userKey: {

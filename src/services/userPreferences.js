@@ -1,6 +1,7 @@
 export const DEFAULT_USER_PREFERENCES = Object.freeze({
   start_category: 'all',
-  navigation_start_mode: 'personal_expanded',
+  interface_mode: 'advanced',
+  navigation_start_mode: 'last_used',
   default_target_mode: 'personal',
   default_organization_id: '',
   default_collection_id: '',
@@ -34,9 +35,16 @@ const START_CATEGORIES = new Set([
   'identities',
 ])
 
+const INTERFACE_MODES = new Set([
+  'standard',
+  'advanced',
+])
+
 const NAVIGATION_MODES = new Set([
+  'last_used',
   'collapsed',
   'personal_expanded',
+  'collections_expanded',
   'expanded',
 ])
 
@@ -123,6 +131,11 @@ export function normalizeUserPreferences(value = {}) {
       source.start_category,
       START_CATEGORIES,
       DEFAULT_USER_PREFERENCES.start_category,
+    ),
+    interface_mode: enumValue(
+      source.interface_mode,
+      INTERFACE_MODES,
+      DEFAULT_USER_PREFERENCES.interface_mode,
     ),
     navigation_start_mode: enumValue(
       source.navigation_start_mode,

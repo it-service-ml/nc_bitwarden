@@ -1,4 +1,5 @@
 const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
 
 function concatBytes(...parts) {
   const arrays = parts.map(part => (
@@ -77,6 +78,130 @@ function encodeBase64(bytes) {
   }
 
   return btoa(binary)
+}
+
+function decodeBase64(value) {
+  const normalized = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+
+  const unpadded = normalized.replace(/=+$/g, '')
+
+  if (
+    !unpadded
+    || !/^[A-Za-z0-9+/]+$/.test(unpadded)
+  ) {
+    throw new Error('Invalid SSH public key encoding.')
+  }
+
+  const padded = unpadded.padEnd(
+    Math.ceil(unpadded.length / 4) * 4,
+    '=',
+  )
+
+  let binary
+
+  try {
+    binary = atob(padded)
+  } catch {
+    throw new Error('Invalid SSH public key encoding.')
+  }
+
+  const output = new Uint8Array(binary.length)
+
+  for (
+    let index = 0;
+    index < binary.length;
+    index += 1
+  ) {
+    output[index] = binary.charCodeAt(index)
+  }
+
+  return output
+}
+
+function readSshString(bytes, offset = 0) {
+  if (offset + 4 > bytes.length) {
+    throw new Error('Invalid SSH public key structure.')
+  }
+
+  const length = new DataView(
+    bytes.buffer,
+    bytes.byteOffset + offset,
+    4,
+  ).getUint32(0, false)
+
+  const start = offset + 4
+  const end = start + length
+
+  if (end > bytes.length) {
+    throw new Error('Invalid SSH public key structure.')
+  }
+
+  return {
+    value: bytes.subarray(start, end),
+    offset: end,
+  }
+}
+
+function publicBlobFromLine(publicKey) {
+  const parts = String(publicKey ?? '')
+    .trim()
+    .split(/\s+/)
+
+  const type = parts[0] ?? ''
+  const encoded = parts[1] ?? ''
+
+  if (
+    !['ssh-ed25519', 'ssh-rsa'].includes(type)
+    || !encoded
+  ) {
+    throw new Error('Unsupported SSH public key.')
+  }
+
+  const publicBlob = decodeBase64(encoded)
+  const typeField = readSshString(publicBlob)
+  const embeddedType = textDecoder.decode(typeField.value)
+
+  if (embeddedType !== type) {
+    throw new Error(
+      'SSH public key type does not match its data.',
+    )
+  }
+
+  if (type === 'ssh-ed25519') {
+    const keyField = readSshString(
+      publicBlob,
+      typeField.offset,
+    )
+
+    if (
+      keyField.value.length !== 32
+      || keyField.offset !== publicBlob.length
+    ) {
+      throw new Error('Invalid Ed25519 public key.')
+    }
+  } else {
+    const exponentField = readSshString(
+      publicBlob,
+      typeField.offset,
+    )
+
+    const modulusField = readSshString(
+      publicBlob,
+      exponentField.offset,
+    )
+
+    if (
+      exponentField.value.length === 0
+      || modulusField.value.length === 0
+      || modulusField.offset !== publicBlob.length
+    ) {
+      throw new Error('Invalid RSA public key.')
+    }
+  }
+
+  return publicBlob
 }
 
 function sshMpint(value) {
@@ -164,6 +289,14 @@ async function fingerprint(publicBlob) {
   )
 
   return `SHA256:${encodeBase64(digest).replace(/=+$/g, '')}`
+}
+
+export async function fingerprintSshPublicKey(
+  publicKey,
+) {
+  return fingerprint(
+    publicBlobFromLine(publicKey),
+  )
 }
 
 function publicKeyLine(type, publicBlob, comment) {

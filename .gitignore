@@ -26,3 +26,5 @@
 
 # Local development patch scripts
 varden_sso_patch*.py
+__pycache__/
+*.py[cod]

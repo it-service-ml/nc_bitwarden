@@ -11,6 +11,51 @@
     />
 
     <div v-else class="bw-unlocked">
+      <div class="bw-interface-mode">
+        <span class="bw-interface-mode__label">
+          {{ t('nc_bitwarden', 'View') }}
+        </span>
+
+        <div
+          class="bw-interface-mode__buttons"
+          role="group"
+          :aria-label="
+            t(
+              'nc_bitwarden',
+              'Switch interface mode',
+            )
+          "
+        >
+          <button
+            type="button"
+            class="bw-interface-mode__button"
+            :class="{
+              'bw-interface-mode__button--active':
+                !isAdvancedMode,
+            }"
+            :aria-pressed="!isAdvancedMode"
+            :disabled="interfaceModeSaving"
+            @click="setInterfaceMode('standard')"
+          >
+            {{ t('nc_bitwarden', 'Standard') }}
+          </button>
+
+          <button
+            type="button"
+            class="bw-interface-mode__button"
+            :class="{
+              'bw-interface-mode__button--active':
+                isAdvancedMode,
+            }"
+            :aria-pressed="isAdvancedMode"
+            :disabled="interfaceModeSaving"
+            @click="setInterfaceMode('advanced')"
+          >
+            {{ t('nc_bitwarden', 'Advanced') }}
+          </button>
+        </div>
+      </div>
+
       <div
         v-if="showOrganizationNotice"
         class="bw-organization-notice"
@@ -61,7 +106,8 @@
             :navigation-start-mode="
               userPreferences.navigation_start_mode
             "
-            @select="selectedItem = $event; showForm = false"
+            :advanced-mode="isAdvancedMode"
+            @select="selectVaultItem"
             @logout="logout"
             @generate-password="showPasswordGenerator = true"
             @settings="showWardenSettings = true"
@@ -82,18 +128,16 @@
         <section class="bw-layout__items">
           <VaultItems
             :items="visibleItems"
+            :collections="collections"
             :title="activeFilterLabel"
             :selected-id="selectedItem?.id"
             :selection-revision="selectionRevision"
 
             :trash-mode="trashMode"
 
+            :advanced-mode="isAdvancedMode"
             @new="openNewForm"
-            @select="
-              selectedItem = $event;
-              showForm = false;
-              editItem = null
-            "
+            @select="selectVaultItem"
             @edit="openEditForm"
             @delete="deleteItem"
             @duplicate="openDuplicateForm"
@@ -132,9 +176,11 @@
             :organizations="organizations"
             :organization-keys="organizationKeys"
             :items="items"
+            :advanced-mode="isAdvancedMode"
 
             :trash-mode="trashMode"
 
+            @request-advanced-mode="setInterfaceMode('advanced')"
             @changed="reloadVaultAndReset($event)"
             @delete="deleteItem"
             @edit="openEditForm"
@@ -168,6 +214,7 @@
             "
             :auto-save="dropTransferActive"
 
+            :advanced-mode="isAdvancedMode"
             :generator-preferences="userPreferences"
             @close="onItemFormClose"
             @attachments-changed="updateItemAttachments"
@@ -220,6 +267,7 @@
       :profile="vaultProfile"
       :organizations="organizations"
       :collections="collections"
+      :advanced-mode="isAdvancedMode"
       @close="showWardenSettings = false"
       @saved="onPreferencesSaved"
       @password-changed="onMasterPasswordChanged"
@@ -252,6 +300,7 @@
     :default-collection-id="
       defaultTarget.collectionId
     "
+    :advanced-mode="isAdvancedMode"
     :generator-preferences="userPreferences"
     headless
     auto-save
@@ -316,6 +365,7 @@ const activeFilterLabel = ref(
 const trashMode = ref(false)
 
 const selectedItem = ref(null)
+const restoreSelectedItemPending = ref(false)
 const loading = ref(false)
 const showForm = ref(false)
 const editItem = ref(null)
@@ -358,6 +408,12 @@ const vaultProfile = ref({})
 const userPreferences = ref(
   normalizeUserPreferences(DEFAULT_USER_PREFERENCES),
 )
+
+const interfaceModeSaving = ref(false)
+
+const isAdvancedMode = computed(() => (
+  userPreferences.value.interface_mode === 'advanced'
+))
 
 const organizationNoticeLoaded = ref(false)
 const organizationNotice = ref({
@@ -480,6 +536,186 @@ const defaultTarget = computed(() => {
   }
 })
 
+const SELECTED_ITEM_STORAGE_KEY =
+  'nc_bitwarden.selected_item.v1'
+
+function currentNextcloudUserId() {
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  return document.head?.getAttribute('data-user')
+    ?? null
+}
+
+function readStoredSelectedItemId() {
+  if (
+    typeof window === 'undefined'
+    || userPreferences.value.navigation_start_mode
+      !== 'last_used'
+  ) {
+    return null
+  }
+
+  const userId = currentNextcloudUserId()
+
+  if (!userId) {
+    return null
+  }
+
+  try {
+    const raw = window.localStorage.getItem(
+      SELECTED_ITEM_STORAGE_KEY,
+    )
+
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw)
+
+    if (
+      parsed?.version !== 1
+      || parsed.userId !== userId
+      || typeof parsed.itemId !== 'string'
+    ) {
+      return null
+    }
+
+    return normalizeId(parsed.itemId)
+  } catch {
+    return null
+  }
+}
+
+function storeSelectedItemId(itemId) {
+  if (
+    typeof window === 'undefined'
+    || userPreferences.value.navigation_start_mode
+      !== 'last_used'
+  ) {
+    return
+  }
+
+  const userId = currentNextcloudUserId()
+  const normalizedItemId = normalizeId(itemId)
+
+  if (!userId) {
+    return
+  }
+
+  try {
+    if (!normalizedItemId) {
+      window.localStorage.removeItem(
+        SELECTED_ITEM_STORAGE_KEY,
+      )
+      return
+    }
+
+    window.localStorage.setItem(
+      SELECTED_ITEM_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        userId,
+        itemId: normalizedItemId,
+      }),
+    )
+  } catch {
+    // Selected item persistence is optional.
+  }
+}
+
+function selectVaultItem(item) {
+  selectedItem.value = item ?? null
+  showForm.value = false
+  editItem.value = null
+
+  storeSelectedItemId(item?.id)
+}
+
+function restoreSelectedItemFromStorage() {
+  const storedItemId = readStoredSelectedItemId()
+
+  if (!storedItemId) {
+    return
+  }
+
+  const matchingItem = items.value.find(item =>
+    normalizeId(item.id) === storedItemId,
+  )
+
+  if (!matchingItem) {
+    storeSelectedItemId(null)
+    return
+  }
+
+  selectedItem.value = matchingItem
+  showForm.value = false
+  editItem.value = null
+}
+
+async function setInterfaceMode(mode) {
+  if (
+    interfaceModeSaving.value
+    || !['standard', 'advanced'].includes(mode)
+    || userPreferences.value.interface_mode === mode
+  ) {
+    return
+  }
+
+  const previousPreferences = {
+    ...userPreferences.value,
+  }
+
+  const nextPreferences = normalizeUserPreferences({
+    ...previousPreferences,
+    interface_mode: mode,
+  })
+
+  userPreferences.value = nextPreferences
+  interfaceModeSaving.value = true
+
+  if (mode === 'standard') {
+    showPasswordGenerator.value = false
+    showFolderDialog.value = false
+    editFolder.value = null
+    showCollectionDialog.value = false
+    editCollection.value = null
+    closeBulkAction()
+  }
+
+  try {
+    const persisted =
+      await VaultwardenApi.savePreferences(
+        nextPreferences,
+      )
+
+    userPreferences.value = normalizeUserPreferences(
+      persisted,
+    )
+  } catch (exception) {
+    userPreferences.value = normalizeUserPreferences(
+      previousPreferences,
+    )
+
+    console.error(
+      '[nc_bitwarden] Interface mode '
+        + 'could not be saved:',
+      exception,
+    )
+
+    alert(
+      exception?.response?.data?.error
+      || t(
+        'nc_bitwarden',
+        'The interface mode could not be saved.',
+      ),
+    )
+  } finally {
+    interfaceModeSaving.value = false
+  }
+}
+
 async function onPreferencesSaved(preferences) {
   userPreferences.value = normalizeUserPreferences(
     preferences,
@@ -499,6 +735,7 @@ async function onLoggedIn({
   await loadOrganizationNoticeSettings()
 
   userKey.value = masterKey
+  restoreSelectedItemPending.value = true
   vaultRevision.value += 1
   isLoggedIn.value = true
 
@@ -616,6 +853,11 @@ async function loadVault() {
       .filter(result => result.status === 'fulfilled')
       .map(result => result.value)
 
+    if (restoreSelectedItemPending.value) {
+      restoreSelectedItemFromStorage()
+      restoreSelectedItemPending.value = false
+    }
+
     visibleItems.value = [...items.value]
     activeFilterLabel.value = t('nc_bitwarden', 'All items')
 
@@ -676,6 +918,7 @@ onMounted(async () => {
     }
 
     userKey.value = restoredKey
+    restoreSelectedItemPending.value = true
     vaultRevision.value += 1
     isLoggedIn.value = true
 
@@ -745,6 +988,10 @@ async function reloadVaultAndReset(selectedId = null) {
     ) ?? null
     : null
 
+  if (selectedItem.value) {
+    storeSelectedItemId(selectedItem.value.id)
+  }
+
   return true
 }
 
@@ -778,12 +1025,14 @@ function openRelatedItem(candidate) {
     return
   }
 
-  selectedItem.value = matchingItem
-  showForm.value = false
-  editItem.value = null
+  selectVaultItem(matchingItem)
 }
 
 function showVaultList() {
+  if (isLoggedIn.value) {
+    storeSelectedItemId(null)
+  }
+
   selectedItem.value = null
   showForm.value = false
   editItem.value = null
@@ -1062,12 +1311,110 @@ function resetBulkSelection() {
   selectionRevision.value += 1
 }
 
+/*
+ * Stufe 2O-2: zentrale Cipher-Berechtigungsprüfung.
+ *
+ * Die Oberfläche blendet unerlaubte Aktionen aus. Diese
+ * Funktionen prüfen zusätzlich unmittelbar vor den API-Aufrufen,
+ * damit künstlich ausgelöste Vue-Ereignisse wirkungslos bleiben.
+ */
+function cipherItemIsPersonal(item) {
+  return !String(
+    item?.organizationId
+    ?? '',
+  ).trim()
+}
+
+function canEditCipherItem(item) {
+  return cipherItemIsPersonal(item)
+    || item?.edit === true
+}
+
+function canViewPasswordForCipherItem(item) {
+  return cipherItemIsPersonal(item)
+    || item?.viewPassword === true
+}
+
+/*
+ * Sammlungs- und Besitzerzuweisungen können geheime Werte aus
+ * einer geschützten Sammlung heraus verschieben. Sie benötigen
+ * deshalb zusätzlich das Recht viewPassword.
+ */
+function canAssignCipherCollections(item) {
+  return (
+    canEditCipherItem(item)
+    && canViewPasswordForCipherItem(item)
+  )
+}
+
+function canManageCipherCollections(item) {
+  if (cipherItemIsPersonal(item)) {
+    return true
+  }
+
+  const collectionIds =
+    item?.collectionIds
+    ?? []
+
+  return collectionIds.some(collectionId =>
+    collections.value.some(collection =>
+      normalizeId(collection.id)
+        === normalizeId(collectionId)
+      && collection.manage === true,
+    ),
+  )
+}
+
+function canDuplicateCipherItem(item) {
+  return (
+    canEditCipherItem(item)
+    && canViewPasswordForCipherItem(item)
+    && canManageCipherCollections(item)
+  )
+}
+
+function canDeleteCipherItem(item) {
+  return cipherItemIsPersonal(item)
+    || item?.permissions?.delete === true
+}
+
+function canRestoreCipherItem(item) {
+  return cipherItemIsPersonal(item)
+    || item?.permissions?.restore === true
+}
+
+function denyCipherAction(action, item = null) {
+  console.warn(
+    '[nc_bitwarden] Cipher action blocked '
+      + 'because permission is missing:',
+    {
+      action,
+      cipherId: item?.id ?? null,
+    },
+  )
+}
+
 function openBulkAction(mode, selectedItems) {
   const candidates = Array.isArray(selectedItems)
     ? selectedItems
     : []
 
   if (!candidates.length) {
+    return
+  }
+
+  const permissionCheck =
+    mode === 'collections'
+      ? canAssignCipherCollections
+      : canEditCipherItem
+
+  if (!candidates.every(permissionCheck)) {
+    denyCipherAction(
+      `bulk-${mode}`,
+      candidates.find(item =>
+        !permissionCheck(item),
+      ),
+    )
     return
   }
 
@@ -1081,6 +1428,23 @@ async function applyBulkAction(payload) {
   const selected = itemsForIds(payload?.itemIds)
 
   if (!selected.length) {
+    closeBulkAction()
+    resetBulkSelection()
+    return
+  }
+
+  const permissionCheck =
+    payload?.mode === 'collections'
+      ? canAssignCipherCollections
+      : canEditCipherItem
+
+  if (!selected.every(permissionCheck)) {
+    denyCipherAction(
+      `bulk-${payload?.mode ?? 'unknown'}`,
+      selected.find(item =>
+        !permissionCheck(item),
+      ),
+    )
     closeBulkAction()
     resetBulkSelection()
     return
@@ -1162,6 +1526,24 @@ async function moveItemsToFolder({
   itemIds,
   folderId,
 }) {
+  const permissionCandidates =
+    itemsForIds(itemIds)
+
+  if (
+    !permissionCandidates.length
+    || !permissionCandidates.every(
+      canEditCipherItem,
+    )
+  ) {
+    denyCipherAction(
+      'move-to-folder',
+      permissionCandidates.find(item =>
+        !canEditCipherItem(item),
+      ),
+    )
+    return
+  }
+
   const selected = itemsForIds(itemIds)
 
   if (
@@ -1232,6 +1614,16 @@ function startNextDropTransfer() {
     )
   }
 
+  if (!canAssignCipherCollections(nextItem)) {
+    denyCipherAction(
+      'organization-transfer',
+      nextItem,
+    )
+    clearDropTransfer()
+    resetBulkSelection()
+    return
+  }
+
   editItem.value = nextItem
   selectedItem.value = null
   showForm.value = true
@@ -1279,6 +1671,24 @@ async function addItemsToCollection({
   itemIds,
   collection,
 }) {
+  const permissionCandidates =
+    itemsForIds(itemIds)
+
+  if (
+    !permissionCandidates.length
+    || !permissionCandidates.every(
+      canAssignCipherCollections,
+    )
+  ) {
+    denyCipherAction(
+      'add-to-collection',
+      permissionCandidates.find(item =>
+        !canAssignCipherCollections(item),
+      ),
+    )
+    return
+  }
+
   const selected = itemsForIds(itemIds)
 
   if (!selected.length || !collection?.id) {
@@ -1438,12 +1848,49 @@ async function addItemsToCollection({
   }
 }
 
+async function runBulkCipherOperation(
+  candidates,
+  operation,
+) {
+  const failures = []
+
+  for (const item of candidates) {
+    try {
+      await operation(item)
+    } catch (exception) {
+      failures.push(exception)
+    }
+  }
+
+  /*
+   * Auch bei Teilfehlern neu laden, da vorherige Operationen
+   * auf dem Vaultwarden-Server bereits erfolgreich gewesen
+   * sein können.
+   */
+  resetBulkSelection()
+  await reloadVaultAndReset()
+
+  if (failures.length > 0) {
+    throw failures[0]
+  }
+}
+
 async function deleteSelectedItems(selectedItems) {
   const candidates = Array.isArray(selectedItems)
     ? selectedItems
     : []
 
   if (!candidates.length) {
+    return
+  }
+
+  if (!candidates.every(canDeleteCipherItem)) {
+    denyCipherAction(
+      'bulk-trash',
+      candidates.find(item =>
+        !canDeleteCipherItem(item),
+      ),
+    )
     return
   }
 
@@ -1460,12 +1907,10 @@ async function deleteSelectedItems(selectedItems) {
   }
 
   try {
-    for (const item of candidates) {
-      await VaultwardenApi.trashCipher(item.id)
-    }
-
-    resetBulkSelection()
-    await reloadVaultAndReset()
+    await runBulkCipherOperation(
+      candidates,
+      item => VaultwardenApi.trashCipher(item.id),
+    )
   } catch (exception) {
     console.error(
       '[nc_bitwarden] Selected items could not be moved to trash:',
@@ -1484,6 +1929,11 @@ async function deleteSelectedItems(selectedItems) {
 
 async function restoreItem(item) {
   if (!item?.id) {
+    return
+  }
+
+  if (!canRestoreCipherItem(item)) {
+    denyCipherAction('restore', item)
     return
   }
 
@@ -1519,6 +1969,16 @@ async function restoreSelectedItems(
     return
   }
 
+  if (!candidates.every(canRestoreCipherItem)) {
+    denyCipherAction(
+      'bulk-restore',
+      candidates.find(item =>
+        !canRestoreCipherItem(item),
+      ),
+    )
+    return
+  }
+
   if (
     !confirm(
       t(
@@ -1534,14 +1994,10 @@ async function restoreSelectedItems(
   }
 
   try {
-    for (const item of candidates) {
-      await VaultwardenApi.restoreCipher(
-        item.id,
-      )
-    }
-
-    resetBulkSelection()
-    await reloadVaultAndReset()
+    await runBulkCipherOperation(
+      candidates,
+      item => VaultwardenApi.restoreCipher(item.id),
+    )
   } catch (exception) {
     console.error(
       '[nc_bitwarden] Selected items '
@@ -1563,6 +2019,14 @@ async function restoreSelectedItems(
 
 async function deleteItemPermanently(item) {
   if (!item?.id) {
+    return
+  }
+
+  if (!canDeleteCipherItem(item)) {
+    denyCipherAction(
+      'delete-permanently',
+      item,
+    )
     return
   }
 
@@ -1618,6 +2082,16 @@ async function deleteSelectedItemsPermanently(
     return
   }
 
+  if (!candidates.every(canDeleteCipherItem)) {
+    denyCipherAction(
+      'bulk-delete-permanently',
+      candidates.find(item =>
+        !canDeleteCipherItem(item),
+      ),
+    )
+    return
+  }
+
   if (
     !confirm(
       t(
@@ -1633,14 +2107,10 @@ async function deleteSelectedItemsPermanently(
   }
 
   try {
-    for (const item of candidates) {
-      await VaultwardenApi.deleteCipher(
-        item.id,
-      )
-    }
-
-    resetBulkSelection()
-    await reloadVaultAndReset()
+    await runBulkCipherOperation(
+      candidates,
+      item => VaultwardenApi.deleteCipher(item.id),
+    )
   } catch (exception) {
     console.error(
       '[nc_bitwarden] Selected items could '
@@ -1665,10 +2135,46 @@ function cloneItemForDraft(item) {
     ? structuredClone(item)
     : JSON.parse(JSON.stringify(item))
 
+  /*
+   * Servergebundene und historische Metadaten dürfen nicht
+   * Bestandteil eines neuen Ciphers werden.
+   */
   delete clone.id
+  delete clone.Id
   delete clone.revisionDate
+  delete clone.RevisionDate
+  delete clone.creationDate
+  delete clone.CreationDate
+  delete clone.deletedDate
+  delete clone.DeletedDate
   delete clone.passwordRevisionDate
+  delete clone.PasswordRevisionDate
   delete clone.passwordHistory
+  delete clone.PasswordHistory
+
+  /*
+   * Attachment-IDs gehören zum ursprünglichen Cipher und
+   * können nicht einfach in einen neuen Eintrag übernommen
+   * werden. Anhänge werden daher bewusst nicht dupliziert.
+   */
+  clone.attachments = []
+  delete clone.Attachments
+
+  /*
+   * FIDO2-Credentials sind eindeutige Passkey-Datensätze.
+   * Eine Kopie derselben Credential-Daten in einem zweiten
+   * Eintrag wäre fachlich und sicherheitstechnisch falsch.
+   */
+  if (
+    clone.login
+    && typeof clone.login === 'object'
+  ) {
+    delete clone.login.fido2Credentials
+    delete clone.login.Fido2Credentials
+    delete clone.login.Fido2credentials
+    delete clone.login.passwordRevisionDate
+    delete clone.login.PasswordRevisionDate
+  }
 
   clone.name = t(
     'nc_bitwarden',
@@ -1683,12 +2189,25 @@ function cloneItemForDraft(item) {
 }
 
 function openDuplicateForm(item) {
+  if (!canDuplicateCipherItem(item)) {
+    denyCipherAction('duplicate', item)
+    return
+  }
+
   editItem.value = cloneItemForDraft(item)
   showForm.value = true
   selectedItem.value = null
 }
 
 async function deleteItem(item) {
+  if (
+    !item?.id
+    || !canDeleteCipherItem(item)
+  ) {
+    denyCipherAction('trash', item)
+    return
+  }
+
   if (!confirm(
     t(
       'nc_bitwarden',
@@ -1730,6 +2249,23 @@ function saveInlineNotes(request) {
     request?.reject?.(
       new Error(
         'Ungültige Notiz-Speicheranfrage.',
+      ),
+    )
+    return
+  }
+
+  if (!canEditCipherItem(request.item)) {
+    denyCipherAction(
+      'save-inline-notes',
+      request.item,
+    )
+
+    request?.reject?.(
+      new Error(
+        t(
+          'nc_bitwarden',
+          'The item could not be saved.',
+        ),
       ),
     )
     return
@@ -1851,7 +2387,13 @@ function openNewForm() {
 }
 
 function openEditForm(item) {
-  if (item?.deletedDate) {
+  if (
+    item?.deletedDate
+    || !canEditCipherItem(item)
+  ) {
+    if (!item?.deletedDate) {
+      denyCipherAction('edit', item)
+    }
     return
   }
 
@@ -1867,6 +2409,50 @@ function openEditForm(item) {
   flex: 1;
   min-height: 0;
   flex-direction: column;
+}
+
+.bw-interface-mode {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-main-background);
+}
+
+.bw-interface-mode__label {
+  color: var(--color-text-maxcontrast);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bw-interface-mode__buttons {
+  display: inline-flex;
+  padding: 0.2rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-pill);
+  background: var(--color-background-dark);
+}
+
+.bw-interface-mode__button {
+  min-height: 2rem;
+  padding: 0.3rem 0.8rem;
+  border: 0;
+  border-radius: var(--border-radius-pill);
+  background: transparent;
+  color: var(--color-main-text);
+  cursor: pointer;
+}
+
+.bw-interface-mode__button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.bw-interface-mode__button--active {
+  background: var(--color-primary-element);
+  color: var(--color-primary-element-text);
 }
 
 .bw-unlocked > .bw-layout {

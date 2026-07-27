@@ -15,7 +15,7 @@
 
       <div class="bw-field-card__actions">
         <button
-          v-if="secret && hasValue"
+          v-if="secret && !revealBlocked && hasValue"
           type="button"
           class="bw-field-card__action"
           :title="revealed
@@ -158,6 +158,19 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+
+  /*
+   * Stufe 2O-3a/2O-3b1:
+   * Ein Geheimwert kann dauerhaft maskiert werden.
+   *
+   * Die negative Property erlaubt den Vue-konformen
+   * Boolean-Standardwert false.
+   */
+  revealBlocked: {
+    type: Boolean,
+    default: false,
+  },
+
   href: {
     type: String,
     default: '',
@@ -248,7 +261,13 @@ const displayValue = computed(() => {
     return t('nc_bitwarden', 'Not provided')
   }
 
-  if (props.secret && !revealed.value) {
+  if (
+    props.secret
+    && (
+      props.revealBlocked
+      || !revealed.value
+    )
+  ) {
     return '••••••••••••'
   }
 
@@ -290,7 +309,10 @@ async function writeClipboard(value) {
 }
 
 async function copyValue() {
-  if (!hasValue.value) {
+  if (
+    !props.copyable
+    || !hasValue.value
+  ) {
     return
   }
 
@@ -310,7 +332,11 @@ async function copyValue() {
 }
 
 watch(
-  () => props.value,
+  [
+    () => props.value,
+    () => props.revealBlocked,
+    () => props.copyable,
+  ],
   () => {
     revealed.value = false
     copied.value = false

@@ -17,13 +17,19 @@
 
             <div class="bw-form__radio-group">
               <NcCheckboxRadioSwitch
-                v-for="typeOption in typeOptions"
+                v-for="typeOption in visibleTypeOptions"
                 :key="typeOption.id"
                 v-model="selectedType"
                 :value="typeOption.id"
                 name="item_type"
                 type="radio"
-                :disabled="isEdit"
+                :disabled="
+                  isEdit
+                    || (
+                      !advancedMode
+                      && ![1, 2].includes(typeOption.id)
+                    )
+                "
               >
                 <span class="bw-form__type-option">
                   <component
@@ -45,6 +51,7 @@
         </div>
 
         <div
+          v-if="advancedMode"
           class="bw-form__tabs"
           role="tablist"
           :aria-label="t('nc_bitwarden', 'Item sections')"
@@ -117,7 +124,10 @@
 
       <div class="bw-form__scroll-area">
         <section
-          v-show="activeTab === 'assignment'"
+          v-show="
+            !advancedMode
+              || activeTab === 'assignment'
+          "
           class="bw-form__tab-panel"
           role="tabpanel"
         >
@@ -139,6 +149,7 @@
               id="bw-item-organization"
               v-model="form.organizationId"
               class="bw-form__select"
+              :disabled="passwordRestricted"
             >
               <option value="">
                 {{ t('nc_bitwarden', 'Personal vault') }}
@@ -186,6 +197,7 @@
                 v-model="collectionSearch"
                 type="search"
                 :placeholder="t('nc_bitwarden', 'Search collections…')"
+                :disabled="passwordRestricted"
                 autocomplete="off"
               >
 
@@ -228,7 +240,7 @@
                     v-model="form.collectionIds"
                     type="checkbox"
                     :value="collection.id"
-                    :disabled="collection.readOnly"
+                    :disabled="passwordRestricted || collection.readOnly"
                   >
 
                   <span class="bw-form__collection-text">
@@ -257,6 +269,7 @@
                     v-model="form.collectionIds"
                     type="checkbox"
                     :value="collection.id"
+                    :disabled="passwordRestricted || collection.readOnly"
                   >
 
                   <span class="bw-form__collection-text">
@@ -287,7 +300,10 @@
             </small>
           </div>
 
-          <div class="bw-form__field">
+          <div
+            v-if="!form.organizationId"
+            class="bw-form__field"
+          >
             <label
               class="bw-form__label"
               for="bw-item-folder"
@@ -315,7 +331,10 @@
         </section>
 
         <section
-          v-show="activeTab === 'content'"
+          v-show="
+            !advancedMode
+              || activeTab === 'content'
+          "
           class="bw-form__tab-panel bw-form__tab-panel--content"
           role="tabpanel"
         >
@@ -325,41 +344,70 @@
               :label="t('nc_bitwarden', 'Username')"
               class="bw-form__field"
             />
-            <NcPasswordField
-              v-model="form.password"
-              :label="t('nc_bitwarden', 'Password')"
-              class="bw-form__field"
-            />
-            <div class="bw-form__full-width">
-              <PasswordGenerator
+            <template v-if="!passwordRestricted">
+              <NcPasswordField
                 v-model="form.password"
-                :preferences="generatorPreferences"
+                :label="t('nc_bitwarden', 'Password')"
+                class="bw-form__field"
               />
-            </div>
+
+              <div class="bw-form__full-width">
+                <PasswordGenerator
+                  v-model="form.password"
+                  :preferences="generatorPreferences"
+                />
+              </div>
+            </template>
+
+            <NcNoteCard
+              v-else
+              type="info"
+              class="bw-form__full-width"
+            >
+              {{
+                t(
+                  'nc_bitwarden',
+                  'Password access is restricted for this item. The password and hidden fields remain unchanged.',
+                )
+              }}
+            </NcNoteCard>
             <div class="bw-form__full-width">
               <label class="bw-form__label">
-                {{ t('nc_bitwarden', 'URLs') }}
+                {{
+                  advancedMode
+                    ? t('nc_bitwarden', 'URLs')
+                    : t('nc_bitwarden', 'URL')
+                }}
               </label>
 
               <div class="bw-form__uri-list">
                 <div
-                  v-for="(loginUri, index) in form.uris"
+                  v-for="(
+                    loginUri,
+                    index
+                  ) in visibleLoginUris"
                   :key="`login-uri-${index}`"
                   class="bw-form__uri-row"
                 >
                   <NcTextField
                     v-model="loginUri.uri"
                     :label="
-                      t(
-                        'nc_bitwarden',
-                        'URL {number}',
-                        { number: index + 1 },
-                      )
+                      advancedMode
+                        ? t(
+                          'nc_bitwarden',
+                          'URL {number}',
+                          { number: index + 1 },
+                        )
+                        : t(
+                          'nc_bitwarden',
+                          'URL',
+                        )
                     "
                     class="bw-form__uri-input"
                   />
 
                   <button
+                    v-if="advancedMode"
                     type="button"
                     class="bw-form__uri-advanced"
                     :aria-expanded="loginUri.advanced"
@@ -381,7 +429,10 @@
                   </button>
 
                   <div
-                    v-if="loginUri.advanced"
+                    v-if="
+                      advancedMode
+                        && loginUri.advanced
+                    "
                     class="bw-form__uri-match"
                   >
                     <label :for="`bw-uri-match-${index}`">
@@ -433,6 +484,7 @@
                   </div>
 
                   <button
+                    v-if="advancedMode"
                     type="button"
                     class="bw-form__uri-remove"
                     :title="
@@ -457,16 +509,25 @@
               </div>
 
               <NcButton
+                v-if="advancedMode"
                 variant="secondary"
                 @click="addLoginUri"
               >
                 {{ t('nc_bitwarden', 'Add URL') }}
               </NcButton>
             </div>
-            <NcTextField
+
+            <NcPasswordField
+              v-if="!advancedMode"
               v-model="form.totp"
-              :label="t('nc_bitwarden', 'TOTP (optional)')"
+              :label="
+                t(
+                  'nc_bitwarden',
+                  'TOTP (optional)',
+                )
+              "
               class="bw-form__field"
+              autocomplete="off"
             />
           </template>
 
@@ -535,12 +596,18 @@
         </section>
 
         <section
-          v-show="activeTab === 'security'"
+          v-show="
+            advancedMode
+              && activeTab === 'security'
+          "
           class="bw-form__tab-panel"
           role="tabpanel"
         >
           <template v-if="Number(selectedType) === 1">
-            <div class="bw-form__security-summary">
+            <div
+              v-if="!passwordRestricted"
+              class="bw-form__security-summary"
+            >
               <div class="bw-form__security-value">
                 <span>{{ t('nc_bitwarden', 'Password strength') }}</span>
                 <strong
@@ -556,6 +623,40 @@
                 <span>{{ t('nc_bitwarden', 'Password age') }}</span>
                 <strong>{{ formPasswordAgeLabel }}</strong>
               </div>
+            </div>
+
+            <div class="bw-form__totp-editor">
+              <div class="bw-form__passkeys-title">
+                {{
+                  t(
+                    'nc_bitwarden',
+                    'Authenticator key (TOTP)',
+                  )
+                }}
+              </div>
+
+              <NcPasswordField
+                v-model="form.totp"
+                :label="
+                  t(
+                    'nc_bitwarden',
+                    'TOTP (optional)',
+                  )
+                "
+                class="
+                  bw-form__field
+                  bw-form__full-width
+                "
+              />
+
+              <p class="bw-form__passkey-hint">
+                {{
+                  t(
+                    'nc_bitwarden',
+                    'Enter a Base32 secret or the complete otpauth URI.',
+                  )
+                }}
+              </p>
             </div>
 
             <div class="bw-form__passkeys">
@@ -629,7 +730,10 @@
         </section>
 
         <section
-          v-show="activeTab === 'attachments'"
+          v-show="
+            advancedMode
+              && activeTab === 'attachments'
+          "
           class="bw-form__tab-panel"
           role="tabpanel"
         >
@@ -638,6 +742,10 @@
             :item="attachmentItem"
             :user-key="userKey"
             :organization-keys="organizationKeys"
+            :read-only="
+              isEdit
+                && item?.edit === false
+            "
             @changed="handleAttachmentsChanged"
           />
 
@@ -655,7 +763,10 @@
         </section>
 
         <section
-          v-show="activeTab === 'content'"
+          v-show="
+            advancedMode
+              && activeTab === 'content'
+          "
           class="bw-form__tab-panel"
           role="tabpanel"
         >
@@ -722,6 +833,9 @@
                   type="button"
                   :title="t('nc_bitwarden', 'Edit')"
                   :aria-label="t('nc_bitwarden', 'Edit')"
+                  :disabled="
+                    customFieldIsProtected(field)
+                  "
                   @click="editCustomField(index)"
                 >
                   ✎
@@ -731,6 +845,9 @@
                   class="bw-form__danger-button"
                   :title="t('nc_bitwarden', 'Delete')"
                   :aria-label="t('nc_bitwarden', 'Delete')"
+                  :disabled="
+                    customFieldIsProtected(field)
+                  "
                   @click="removeCustomField(index)"
                 >
                   ×
@@ -778,6 +895,10 @@
                   v-for="option in customFieldTypeOptions"
                   :key="option.value"
                   :value="option.value"
+                  :disabled="
+                    passwordRestricted
+                      && option.value === FIELD_TYPE_HIDDEN
+                  "
                 >
                   {{ option.label }}
                 </option>
@@ -849,12 +970,14 @@
           </div>
         </section>
 
-        <p
+        <div
           v-if="error"
           class="bw-form__error"
+          role="alert"
+          aria-live="assertive"
         >
           {{ error }}
-        </p>
+        </div>
       </div>
     </div>
 
@@ -945,6 +1068,11 @@ const props = defineProps({
     default: false,
   },
 
+  advancedMode: {
+    type: Boolean,
+    required: true,
+  },
+
   generatorPreferences: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits([
@@ -963,10 +1091,39 @@ const error = ref('')
 const collectionSearch = ref('')
 const activeTab = ref('assignment')
 const isEdit = computed(() => Boolean(props.item?.id))
-const selectedType = ref(Number(props.item?.type ?? props.defaultItemType ?? 1))
-const formAttachments = ref([
-  ...(props.item?.attachments ?? []),
-])
+
+/*
+ * Stufe 2O-3b:
+ * Ein Benutzer darf den übrigen Eintrag bearbeiten, ohne dass
+ * Passwort oder verborgene benutzerdefinierte Felder in sichtbare
+ * Editoren übernommen werden.
+ */
+const passwordRestricted = computed(() =>
+  isEdit.value
+    && (
+      props.item?.viewPassword
+      ?? props.item?.ViewPassword
+    ) === false,
+)
+
+const requestedInitialType = Number(
+  props.item?.type
+    ?? props.defaultItemType
+    ?? 1,
+)
+
+const selectedType = ref(
+  props.advancedMode
+    || isEdit.value
+    || [1, 2].includes(requestedInitialType)
+    ? requestedInitialType
+    : 1,
+)
+const formAttachments = ref(
+  isEdit.value
+    ? [...(props.item?.attachments ?? [])]
+    : [],
+)
 
 watch(selectedType, value => {
   if (
@@ -1048,8 +1205,21 @@ const form = reactive({
   collectionIds: [...initialCollectionIds],
   folderId: props.item?.folderId ?? '',
   favorite: Boolean(props.item?.favorite),
+  reprompt: Number(
+    props.item?.reprompt
+    ?? props.item?.Reprompt
+    ?? 0,
+  ) || 0,
   username: props.item?.login?.username ?? '',
-  password: props.item?.login?.password ?? '',
+
+  /*
+   * Das vorhandene Passwort bleibt ausschließlich in props.item
+   * und wird nicht an ein sichtbares Formularfeld gebunden.
+   */
+  password: passwordRestricted.value
+    ? ''
+    : (props.item?.login?.password ?? ''),
+
   uris: (
     props.item?.login?.uris?.length
       ? props.item.login.uris
@@ -1092,6 +1262,34 @@ const form = reactive({
   sshFingerprint: props.item?.sshKey?.keyFingerprint ?? '',
   fields: (props.item?.fields ?? []).map(normalizeCustomField),
 })
+
+/*
+ * Snapshot aller bereits vorhandenen verborgenen Felder.
+ * Die localId bleibt auch bei einer Sortierung erhalten.
+ */
+const protectedHiddenFieldSnapshots = new Map(
+  passwordRestricted.value
+    ? form.fields
+      .filter(field =>
+        Number(field.type) === FIELD_TYPE_HIDDEN,
+      )
+      .map(field => [
+        field.localId,
+        JSON.stringify({
+          type: Number(field.type),
+          name: String(field.name ?? ''),
+          value: String(field.value ?? ''),
+          linkedId: field.linkedId ?? null,
+        }),
+      ])
+    : [],
+)
+
+const visibleLoginUris = computed(() => (
+  props.advancedMode
+    ? form.uris
+    : form.uris.slice(0, 1)
+))
 
 const attachmentItem = computed(() => ({
   ...(props.item ?? {}),
@@ -1256,9 +1454,15 @@ function serializedFormState() {
         localId: field.localId,
         type: Number(field.type),
         name: String(field.name ?? ''),
-        value: field.type === FIELD_TYPE_BOOLEAN
-          ? Boolean(field.value)
-          : String(field.value ?? ''),
+        value:
+          passwordRestricted.value
+            && Number(field.type) === FIELD_TYPE_HIDDEN
+            ? '__protected_hidden_field__'
+            : (
+              field.type === FIELD_TYPE_BOOLEAN
+                ? Boolean(field.value)
+                : String(field.value ?? '')
+            ),
         linkedId: field.linkedId === null
           ? null
           : Number(field.linkedId),
@@ -1282,29 +1486,52 @@ const typeOptions = [
   { id: 5, label: t('nc_bitwarden', 'SSH key'), icon: KeyOutlineIcon },
 ]
 
+const visibleTypeOptions = computed(() => {
+  if (props.advancedMode) {
+    return typeOptions
+  }
+
+  if (isEdit.value) {
+    return typeOptions.filter(
+      option =>
+        option.id === Number(selectedType.value),
+    )
+  }
+
+  const visibleIds = new Set([
+    1,
+    2,
+    Number(selectedType.value),
+  ])
+
+  return typeOptions.filter(
+    option => visibleIds.has(option.id),
+  )
+})
+
 const linkedFieldsByType = {
   1: [
-    [100, 'Username'], [101, 'Password'],
+    [100, t('nc_bitwarden', 'Username')], [101, t('nc_bitwarden', 'Password')],
   ],
   3: [
-    [300, 'Cardholder'], [301, 'Expiration month'], [302, 'Expiration year'],
-    [303, 'CVV'], [304, 'Card brand'], [305, 'Card number'],
+    [300, t('nc_bitwarden', 'Cardholder')], [301, t('nc_bitwarden', 'Expiration month')], [302, t('nc_bitwarden', 'Expiration year')],
+    [303, t('nc_bitwarden', 'CVV')], [304, t('nc_bitwarden', 'Card brand')], [305, t('nc_bitwarden', 'Card number')],
   ],
   4: [
-    [400, 'Title'], [401, 'Middle name'], [402, 'Address line 1'],
-    [403, 'Address line 2'], [404, 'Address line 3'], [405, 'City'],
-    [406, 'State / region'], [407, 'Postal code'], [408, 'Country'],
-    [409, 'Company'], [410, 'Email'], [411, 'Phone'],
-    [412, 'Social security number'], [413, 'Username'],
-    [414, 'Passport number'], [415, 'License number'],
-    [416, 'First name'], [417, 'Last name'], [418, 'Full name'],
+    [400, t('nc_bitwarden', 'Title')], [401, t('nc_bitwarden', 'Middle name')], [402, t('nc_bitwarden', 'Address line 1')],
+    [403, t('nc_bitwarden', 'Address line 2')], [404, t('nc_bitwarden', 'Address line 3')], [405, t('nc_bitwarden', 'City')],
+    [406, t('nc_bitwarden', 'State / region')], [407, t('nc_bitwarden', 'Postal code')], [408, t('nc_bitwarden', 'Country')],
+    [409, t('nc_bitwarden', 'Company')], [410, t('nc_bitwarden', 'Email')], [411, t('nc_bitwarden', 'Phone')],
+    [412, t('nc_bitwarden', 'Social security number')], [413, t('nc_bitwarden', 'Username')],
+    [414, t('nc_bitwarden', 'Passport number')], [415, t('nc_bitwarden', 'License number')],
+    [416, t('nc_bitwarden', 'First name')], [417, t('nc_bitwarden', 'Last name')], [418, t('nc_bitwarden', 'Full name')],
   ],
 }
 
 const linkedFieldOptions = computed(() =>
   (linkedFieldsByType[selectedType.value] ?? []).map(([value, label]) => ({
     value,
-    label: t('nc_bitwarden', label),
+    label,
   })),
 )
 
@@ -1485,6 +1712,56 @@ function linkedFieldLabel(linkedId) {
   return linkedFieldOptions.value.find(option => option.value === Number(linkedId))?.label
     ?? t('nc_bitwarden', 'Unavailable linked field')
 }
+function customFieldIsProtected(field) {
+  return (
+    passwordRestricted.value
+    && Number(field?.type) === FIELD_TYPE_HIDDEN
+  )
+}
+
+function protectedHiddenFieldsPreserved() {
+  if (!passwordRestricted.value) {
+    return true
+  }
+
+  const currentFields = new Map(
+    form.fields.map(field => [
+      field.localId,
+      field,
+    ]),
+  )
+
+  const existingFieldsUnchanged =
+    [...protectedHiddenFieldSnapshots.entries()]
+      .every(([localId, snapshot]) => {
+        const field = currentFields.get(localId)
+
+        if (!field) {
+          return false
+        }
+
+        return JSON.stringify({
+          type: Number(field.type),
+          name: String(field.name ?? ''),
+          value: String(field.value ?? ''),
+          linkedId: field.linkedId ?? null,
+        }) === snapshot
+      })
+
+  const noNewHiddenFields =
+    form.fields.every(field =>
+      Number(field.type) !== FIELD_TYPE_HIDDEN
+        || protectedHiddenFieldSnapshots.has(
+          field.localId,
+        ),
+    )
+
+  return (
+    existingFieldsUnchanged
+    && noNewHiddenFields
+  )
+}
+
 function customFieldPreview(field) {
   if (field.type === FIELD_TYPE_HIDDEN) return '••••••••'
   if (field.type === FIELD_TYPE_BOOLEAN) return field.value ? t('nc_bitwarden', 'Yes') : t('nc_bitwarden', 'No')
@@ -1497,6 +1774,11 @@ function resetFieldEditor() {
 function openCustomFieldEditor() { resetFieldEditor(); fieldEditor.open = true }
 function editCustomField(index) {
   const field = form.fields[index]
+
+  if (customFieldIsProtected(field)) {
+    return
+  }
+
   Object.assign(fieldEditor, {
     open: true,
     index,
@@ -1509,7 +1791,24 @@ function editCustomField(index) {
 }
 function cancelCustomFieldEditor() { resetFieldEditor() }
 function applyCustomField() {
+  const currentField =
+    fieldEditor.index === null
+      ? null
+      : form.fields[fieldEditor.index]
+
+  if (
+    passwordRestricted.value
+    && (
+      Number(fieldEditor.type)
+        === FIELD_TYPE_HIDDEN
+      || customFieldIsProtected(currentField)
+    )
+  ) {
+    return
+  }
+
   if (!canApplyCustomField.value) return
+
   const field = {
     localId: fieldEditor.index === null ? localFieldId() : form.fields[fieldEditor.index].localId,
     type: Number(fieldEditor.type),
@@ -1522,8 +1821,19 @@ function applyCustomField() {
   resetFieldEditor()
 }
 function removeCustomField(index) {
+  if (
+    customFieldIsProtected(
+      form.fields[index],
+    )
+  ) {
+    return
+  }
+
   form.fields.splice(index, 1)
-  if (fieldEditor.open) resetFieldEditor()
+
+  if (fieldEditor.open) {
+    resetFieldEditor()
+  }
 }
 function moveCustomField(index, offset) {
   const target = index + offset
@@ -1558,7 +1868,11 @@ function removePasskey(index) {
 
   if (
     !window.confirm(
-      `Passkey „${name}“ aus diesem Eintrag entfernen?`,
+      t(
+        'nc_bitwarden',
+        'Remove passkey {name} from this item?',
+        { name },
+      ),
     )
   ) {
     return
@@ -1650,12 +1964,51 @@ async function buildPayload() {
     favorite: Boolean(form.favorite),
     folderId: effectiveOrganizationId() ? null : (form.folderId || null),
     fields: await encryptedCustomFields(encryptionKey),
-    reprompt: 0,
+    reprompt: Number(form.reprompt) || 0,
   }
 
   // Der Payload wird immer mit dem ausgewählten Zielbesitzer
   // und dessen Schlüssel erzeugt.
   payload.organizationId = effectiveOrganizationId()
+
+  /*
+   * Optimistische Versionskontrolle:
+   *
+   * Vaultwarden vergleicht lastKnownRevisionDate mit der
+   * aktuellen Serverrevision. Wurde der Eintrag zwischenzeitlich
+   * durch einen anderen Client geändert, wird das Update abgelehnt,
+   * statt die neuere Version unbemerkt zu überschreiben.
+   */
+  if (isEdit.value) {
+    const lastKnownRevisionDate = String(
+      props.item?.revisionDate
+      ?? props.item?.RevisionDate
+      ?? '',
+    ).trim()
+
+    if (
+      !lastKnownRevisionDate
+      || Number.isNaN(
+        Date.parse(lastKnownRevisionDate),
+      )
+    ) {
+      console.error(
+        '[nc_bitwarden] Valid revision date missing '
+          + 'for existing cipher:',
+        props.item?.id,
+      )
+
+      throw new Error(
+        t(
+          'nc_bitwarden',
+          'The item could not be saved.',
+        ),
+      )
+    }
+
+    payload.lastKnownRevisionDate =
+      lastKnownRevisionDate
+  }
 
   if (selectedType.value === 1) {
     // Datum der letzten Passwortänderung erhalten.
@@ -1663,13 +2016,20 @@ async function buildPayload() {
       props.item?.login?.password ?? '',
     )
 
-    const currentPassword = String(
-      form.password ?? '',
-    )
+    const currentPassword =
+      passwordRestricted.value
+        ? originalPassword
+        : String(
+          form.password ?? '',
+        )
 
     const passwordChanged =
-      !isEdit.value
-      || currentPassword !== originalPassword
+      passwordRestricted.value
+        ? false
+        : (
+          !isEdit.value
+          || currentPassword !== originalPassword
+        )
 
     const passwordRevisionDate = passwordChanged
       ? new Date().toISOString()
@@ -1744,9 +2104,9 @@ async function buildPayload() {
         )
         : null,
 
-      password: form.password
+      password: currentPassword
         ? await encrypt(
-          form.password,
+          currentPassword,
           encryptionKey,
         )
         : null,
@@ -1875,12 +2235,233 @@ onMounted(() => {
   }, 0)
 })
 
+function arrayEntryCount(value) {
+  return Array.isArray(value)
+    ? value.length
+    : 0
+}
+
+function uriMatchRuleCount(uris) {
+  if (!Array.isArray(uris)) {
+    return 0
+  }
+
+  return uris.filter(uri => (
+    uri?.match !== null
+    && uri?.match !== undefined
+  )).length
+}
+
+function hiddenAdvancedDataLossRisks(payload) {
+  if (
+    props.advancedMode
+    || !isEdit.value
+    || !props.item
+  ) {
+    return []
+  }
+
+  const risks = []
+
+  if (
+    arrayEntryCount(payload.fields)
+      < arrayEntryCount(props.item.fields)
+  ) {
+    risks.push(
+      t(
+        'nc_bitwarden',
+        'custom fields',
+      ),
+    )
+  }
+
+  if (
+    arrayEntryCount(payload.login?.uris)
+      < arrayEntryCount(
+        props.item.login?.uris,
+      )
+  ) {
+    risks.push(
+      t(
+        'nc_bitwarden',
+        'URLs',
+      ),
+    )
+  }
+
+  if (
+    uriMatchRuleCount(payload.login?.uris)
+      < uriMatchRuleCount(
+        props.item.login?.uris,
+      )
+  ) {
+    risks.push(
+      t(
+        'nc_bitwarden',
+        'URI match rules',
+      ),
+    )
+  }
+
+  if (
+    arrayEntryCount(
+      payload.login?.fido2Credentials,
+    )
+      < arrayEntryCount(
+        props.item.login?.fido2Credentials,
+      )
+  ) {
+    risks.push(
+      t(
+        'nc_bitwarden',
+        'passkeys',
+      ),
+    )
+  }
+
+  const expectedPasswordHistoryCount =
+    Math.min(
+      arrayEntryCount(
+        props.item.passwordHistory,
+      ),
+      5,
+    )
+
+  if (
+    arrayEntryCount(payload.passwordHistory)
+      < expectedPasswordHistoryCount
+  ) {
+    risks.push(
+      t(
+        'nc_bitwarden',
+        'password history',
+      ),
+    )
+  }
+
+  return risks
+}
+
+function assertStandardModeDataPreserved(payload) {
+  const risks =
+    hiddenAdvancedDataLossRisks(payload)
+
+  if (!risks.length) {
+    return
+  }
+
+  throw new Error(
+    t(
+      'nc_bitwarden',
+      'Saving was stopped because hidden advanced data would be lost: {data}.',
+      {
+        data: risks.join(', '),
+      },
+    ),
+  )
+}
+
+function exceptionSearchText(exception) {
+  const values = [
+    exception?.response?.data?.message,
+    exception?.response?.data?.error,
+    exception?.message,
+  ]
+
+  try {
+    values.push(
+      JSON.stringify(
+        exception?.response?.data ?? {},
+      ),
+    )
+  } catch {
+    // Nicht serialisierbare Fehlerdaten werden ignoriert.
+  }
+
+  return values
+    .filter(value => typeof value === 'string')
+    .join('\n')
+    .toLowerCase()
+}
+
+function isCipherRevisionConflict(exception) {
+  const message = exceptionSearchText(exception)
+
+  return (
+    message.includes(
+      'client copy of this cipher is out of date',
+    )
+    || message.includes(
+      'organization mismatch. please resync',
+    )
+  )
+}
+
+function itemSaveErrorMessage(exception) {
+  if (isCipherRevisionConflict(exception)) {
+    return t(
+      'nc_bitwarden',
+      'The item was changed in another client. Your changes were not saved. Reload the vault and open the item again.',
+    )
+  }
+
+  return (
+    exception?.response?.data?.message
+    || exception?.response?.data?.error
+    || exception?.message
+    || t(
+      'nc_bitwarden',
+      'The item could not be saved.',
+    )
+  )
+}
+
 async function save() {
+  /*
+   * Stufe 2O-2: schreibgeschützte Einträge dürfen auch dann
+   * nicht gespeichert werden, wenn save() künstlich ausgelöst
+   * oder das Formular über ein fremdes Ereignis geöffnet wurde.
+   */
+  if (
+    isEdit.value
+    && props.item?.edit === false
+  ) {
+    error.value = t(
+      'nc_bitwarden',
+      'The item could not be saved.',
+    )
+    return
+  }
+
+  if (passwordRestricted.value) {
+    if (
+      ownerChanged()
+      || collectionSelectionChanged()
+    ) {
+      error.value = t(
+        'nc_bitwarden',
+        'The vault or collection assignment cannot be changed because password access is restricted for this item.',
+      )
+      return
+    }
+
+    if (!protectedHiddenFieldsPreserved()) {
+      error.value = t(
+        'nc_bitwarden',
+        'Password access is restricted for this item. The password and hidden fields remain unchanged.',
+      )
+      return
+    }
+  }
+
   if (saving.value || !canSave.value) return
   saving.value = true
   error.value = ''
   try {
     const payload = await buildPayload()
+
+    assertStandardModeDataPreserved(payload)
+
     let raw
     const collectionIds = targetCollectionIds()
 
@@ -2000,8 +2581,11 @@ async function save() {
     allowCloseWithoutPrompt = true
     emit('saved', { item: decrypted, created: !isEdit.value })
   } catch (exception) {
-    console.error('[nc_bitwarden] Item could not be saved:', exception)
-    error.value = exception?.response?.data?.error || exception?.response?.data?.message || exception?.message || t('nc_bitwarden', 'The item could not be saved.')
+    console.error(
+      '[nc_bitwarden] Item could not be saved:',
+      exception,
+    )
+    error.value = itemSaveErrorMessage(exception)
 
     if (props.autoSave) {
       emit('auto-save-failed', exception)
@@ -3144,6 +3728,28 @@ async function save() {
   .bw-form__uri-remove {
     justify-self: end;
   }
+}
+
+/* Stufe 2N-3: gut sichtbare Speicher- und Konfliktfehler */
+.bw-form__error {
+  flex: 0 0 auto;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 2px solid var(--color-error, #c62828);
+  border-left-width: 6px;
+  border-radius: var(--border-radius-large, 10px);
+  background-color: rgba(198, 40, 40, 0.12);
+  background-color: color-mix(
+    in srgb,
+    var(--color-error, #c62828) 14%,
+    var(--color-main-background, #ffffff)
+  );
+  color: var(--color-main-text, #1f1f1f);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  font-weight: 600;
+  line-height: 1.45;
+  opacity: 1 !important;
+  white-space: normal;
 }
 
 </style>

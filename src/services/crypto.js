@@ -487,6 +487,53 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
     }
   }
 
+  const organizationId =
+    cipher.OrganizationId
+    ?? cipher.organizationId
+    ?? null
+
+  /*
+   * Vaultwarden berechnet die effektiven Rechte pro Cipher.
+   * Diese Werte dürfen beim Entschlüsseln nicht verloren gehen.
+   *
+   * Persönliche Einträge gelten bei älteren Serverantworten
+   * weiterhin als vollständig verwendbar. Bei einem
+   * Organisationseintrag ohne Berechtigungsfelder verwenden
+   * wir dagegen bewusst die sichere Standardeinstellung false.
+   */
+  const personalItem = !String(
+    organizationId ?? '',
+  ).trim()
+
+  const canEdit = Boolean(
+    cipher.Edit
+    ?? cipher.edit
+    ?? personalItem,
+  )
+
+  const canViewPassword = Boolean(
+    cipher.ViewPassword
+    ?? cipher.viewPassword
+    ?? personalItem,
+  )
+
+  const rawPermissions =
+    cipher.Permissions
+    ?? cipher.permissions
+    ?? {}
+
+  const canDelete = Boolean(
+    rawPermissions.Delete
+    ?? rawPermissions.delete
+    ?? canEdit,
+  )
+
+  const canRestore = Boolean(
+    rawPermissions.Restore
+    ?? rawPermissions.restore
+    ?? canDelete,
+  )
+
   const base = {
     id: cipher.Id,
     type: cipher.Type,
@@ -495,6 +542,11 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
       ? cipher.CollectionIds
       : [],
     favorite: cipher.Favorite,
+    reprompt: Number(
+      cipher.Reprompt
+      ?? cipher.reprompt
+      ?? 0,
+    ) || 0,
     name: await dec(cipher.Name),
     notes: await dec(cipher.Notes),
     revisionDate: cipher.RevisionDate,
@@ -507,7 +559,13 @@ export async function decryptCipher(cipher, userKey, orgKeys = {}) {
       ?? cipher.deletedDate
       ?? null,
 
-    organizationId: cipher.OrganizationId ?? null,
+    organizationId,
+    edit: canEdit,
+    viewPassword: canViewPassword,
+    permissions: {
+      delete: canDelete,
+      restore: canRestore,
+    },
   }
 
   const rawPasswordHistory = Array.isArray(

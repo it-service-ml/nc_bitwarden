@@ -600,7 +600,8 @@ final class UserSettingsService {
 	): array {
 		$defaults = [
 			'start_category' => 'all',
-			'navigation_start_mode' => 'personal_expanded',
+			'interface_mode' => 'advanced',
+			'navigation_start_mode' => 'last_used',
 			'default_target_mode' => 'personal',
 			'default_organization_id' => '',
 			'default_collection_id' => '',
@@ -640,11 +641,22 @@ final class UserSettingsService {
 			$defaults['start_category'],
 		);
 
+		$interfaceMode = $this->allowedString(
+			$value['interface_mode'],
+			[
+				'standard',
+				'advanced',
+			],
+			$defaults['interface_mode'],
+		);
+
 		$navigationStartMode = $this->allowedString(
 			$value['navigation_start_mode'],
 			[
+				'last_used',
 				'collapsed',
 				'personal_expanded',
+				'collections_expanded',
 				'expanded',
 			],
 			$defaults['navigation_start_mode'],
@@ -699,6 +711,7 @@ final class UserSettingsService {
 
 		return [
 			'start_category' => $startCategory,
+			'interface_mode' => $interfaceMode,
 			'navigation_start_mode' => $navigationStartMode,
 			'default_target_mode' => $defaultTargetMode,
 			'default_organization_id' => $this->shortString(

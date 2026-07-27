@@ -22,6 +22,7 @@
         </button>
 
         <div
+          v-if="advancedMode"
           class="bw-vault__scope-switch"
           role="group"
           :aria-label="t('nc_bitwarden', 'Search scope')"
@@ -78,7 +79,10 @@
     </div>
 
     <!-- Sortierung -->
-    <div class="bw-vault__sort">
+    <div
+      v-if="advancedMode"
+      class="bw-vault__sort"
+    >
       <label for="bw-vault-sort">
         {{ t('nc_bitwarden', 'Sort') }}
       </label>
@@ -102,51 +106,76 @@
     </div>
 
     <div class="bw-vault__navigation">
-      <!-- Kategorien -->
-      <div class="bw-vault__folders">
+      <!-- Kompakter Kategorienfilter -->
+      <div class="bw-vault__folders bw-vault__categories">
         <div class="bw-vault__section-heading">
-          <button
-            type="button"
-            class="bw-vault__section-toggle"
-            :aria-expanded="!collapsedSections.categories"
-            @click="toggleSection('categories')"
+          <span
+            class="
+              bw-vault__section-title
+              bw-vault__section-title--static
+            "
           >
-            <ChevronRightIcon
-              v-if="collapsedSections.categories"
-              :size="17"
-            />
-
-            <ChevronDownIcon
-              v-else
-              :size="17"
-            />
-
-            <span class="bw-vault__section-title">
-              {{ t('nc_bitwarden', 'Categories') }}
-            </span>
-          </button>
+            {{ t('nc_bitwarden', 'Category') }}
+          </span>
         </div>
 
-        <button
-          v-for="category in categories"
-          v-show="!collapsedSections.categories"
-          :key="category.id"
-          class="bw-folder"
-          :class="{ 'bw-folder--active':
-            selectedCategory === category.id
-            && selectedFolder === null
-            && selectedCollection === null
-          }"
-          @click="selectCategory(category.id)"
+        <details
+          ref="categoryMenu"
+          class="bw-category-select"
         >
-          <component
-            :is="category.icon"
-            :size="17"
-            class="bw-folder__icon"
-          />
-          {{ category.label }}
-          <span class="bw-folder__count">{{ categoryCount(category.id) }}</span>
-        </button>
+          <summary class="bw-category-select__current">
+            <component
+              :is="activeCategory.icon"
+              :size="18"
+              class="bw-category-select__icon"
+            />
+
+            <span class="bw-category-select__label">
+              {{ activeCategory.label }}
+            </span>
+
+            <span class="bw-folder__count">
+              {{ categoryCount(activeCategory.id) }}
+            </span>
+
+            <ChevronDownIcon
+              :size="18"
+              class="bw-category-select__chevron"
+            />
+          </summary>
+
+          <div class="bw-category-select__menu">
+            <button
+              v-for="category in visibleCategories"
+              :key="category.id"
+              type="button"
+              class="bw-category-select__option"
+              :class="{
+                'bw-category-select__option--active':
+                  selectedCategory === category.id
+                  && selectedFolder === null
+                  && selectedCollection === null,
+                'bw-category-select__option--trash':
+                  category.id === 'trash',
+              }"
+              @click="selectCategory(category.id)"
+            >
+              <component
+                :is="category.icon"
+                :size="18"
+                class="bw-category-select__icon"
+              />
+
+              <span class="bw-category-select__label">
+                {{ category.label }}
+              </span>
+
+              <span class="bw-folder__count">
+                {{ categoryCount(category.id) }}
+              </span>
+            </button>
+          </div>
+        </details>
       </div>
 
       <!-- Ordner -->
@@ -174,6 +203,7 @@
           </button>
 
           <button
+            v-if="advancedMode"
             type="button"
             class="bw-vault__section-action"
             :title="t(
@@ -251,7 +281,10 @@
             </span>
           </button>
 
-          <div class="bw-folder-row__actions">
+          <div
+            v-if="advancedMode"
+            class="bw-folder-row__actions"
+          >
             <button
               type="button"
               class="bw-folder-row__action"
@@ -326,6 +359,7 @@
             </button>
 
             <button
+              v-if="advancedMode"
               type="button"
               class="bw-vault__tree-action"
               :disabled="allCollectionRows.length === 0"
@@ -347,6 +381,7 @@
             </button>
 
             <button
+              v-if="advancedMode"
               type="button"
               class="bw-vault__tree-action"
               :disabled="allCollectionRows.length === 0"
@@ -369,7 +404,10 @@
           </div>
 
           <button
-            v-if="canCreateCollection"
+            v-if="
+              advancedMode
+                && canCreateCollection
+            "
             type="button"
             class="bw-vault__section-action"
             :title="t('nc_bitwarden', 'Create new collection')"
@@ -382,7 +420,8 @@
 
         <div
           v-if="
-            !collapsedSections.collections
+            advancedMode
+              && !collapsedSections.collections
               && allCollectionRows.length > 0
           "
           class="bw-collection-search"
@@ -409,7 +448,8 @@
 
         <div
           v-if="
-            !collapsedSections.collections
+            advancedMode
+              && !collapsedSections.collections
               && collectionSearch
           "
           class="bw-collection-search__summary"
@@ -490,7 +530,13 @@
           </button>
 
           <div
-            v-if="collection.canManage || collection.canDelete"
+            v-if="
+              advancedMode
+                && (
+                  collection.canManage
+                  || collection.canDelete
+                )
+            "
             class="bw-folder-row__actions"
           >
             <button
@@ -546,7 +592,10 @@
 
     <!-- Footer -->
     <div class="bw-vault__footer">
-      <NcButton @click="$emit('generate-password')">
+      <NcButton
+        v-if="advancedMode"
+        @click="$emit('generate-password')"
+      >
         <template #icon>
           <KeyOutlineIcon :size="16" />
         </template>
@@ -571,7 +620,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import ViewListOutlineIcon from 'vue-material-design-icons/ViewListOutline.vue'
@@ -614,6 +669,10 @@ const props = defineProps({
   organizations: {
     type: Array,
     default: () => [],
+  },
+  advancedMode: {
+    type: Boolean,
+    required: true,
   },
   selectedId: {
     type: String,
@@ -658,8 +717,10 @@ const START_CATEGORIES = new Set([
 ])
 
 const NAVIGATION_MODES = new Set([
+  'last_used',
   'collapsed',
   'personal_expanded',
+  'collections_expanded',
   'expanded',
 ])
 
@@ -674,7 +735,234 @@ function initialNavigationMode() {
     props.navigationStartMode,
   )
     ? props.navigationStartMode
-    : 'personal_expanded'
+    : 'last_used'
+}
+
+const NAVIGATION_STATE_STORAGE_KEY =
+  'nc_bitwarden.navigation_sections.v1'
+
+const NAVIGATION_SELECTION_STORAGE_KEY =
+  'nc_bitwarden.navigation_selection.v1'
+
+function readStoredNavigationSections() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const stored = window.localStorage.getItem(
+      NAVIGATION_STATE_STORAGE_KEY,
+    )
+
+    if (!stored) {
+      return null
+    }
+
+    const parsed = JSON.parse(stored)
+
+    if (
+      typeof parsed?.folders !== 'boolean'
+      || typeof parsed?.collections !== 'boolean'
+    ) {
+      return null
+    }
+
+    const storedCollectionPaths =
+      Array.isArray(parsed.collapsedCollectionPaths)
+        ? [
+          ...new Set(
+            parsed.collapsedCollectionPaths
+              .map(value =>
+                String(value ?? '').trim(),
+              )
+              .filter(Boolean),
+          ),
+        ]
+        : null
+
+    return {
+      folders: parsed.folders,
+      collections: parsed.collections,
+      collapsedCollectionPaths: storedCollectionPaths,
+      selectedCategory:
+        typeof parsed.selectedCategory === 'string'
+          ? parsed.selectedCategory
+          : null,
+      selectedFolder:
+        parsed.selectedFolder === null
+        || typeof parsed.selectedFolder === 'string'
+          ? parsed.selectedFolder
+          : null,
+      selectedCollection:
+        parsed.selectedCollection === null
+        || typeof parsed.selectedCollection === 'string'
+          ? parsed.selectedCollection
+          : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+function navigationSectionsForMode(mode) {
+  if (mode === 'last_used') {
+    return readStoredNavigationSections() ?? {
+      folders: false,
+      collections: true,
+    }
+  }
+
+  if (mode === 'collapsed') {
+    return {
+      folders: true,
+      collections: true,
+    }
+  }
+
+  if (mode === 'collections_expanded') {
+    return {
+      folders: true,
+      collections: false,
+    }
+  }
+
+  if (mode === 'expanded') {
+    return {
+      folders: false,
+      collections: false,
+    }
+  }
+
+  return {
+    folders: false,
+    collections: true,
+  }
+}
+
+function storeNavigationSections(
+  sections,
+  collectionPaths,
+) {
+  if (
+    typeof window === 'undefined'
+    || props.navigationStartMode !== 'last_used'
+  ) {
+    return
+  }
+
+  const normalizedCollectionPaths = [
+    ...new Set(
+      [...(collectionPaths ?? [])]
+        .map(value =>
+          String(value ?? '').trim(),
+        )
+        .filter(Boolean),
+    ),
+  ].sort()
+
+  const storedState =
+    readStoredNavigationSections() ?? {}
+
+  try {
+    window.localStorage.setItem(
+      NAVIGATION_STATE_STORAGE_KEY,
+      JSON.stringify({
+        ...storedState,
+        folders: Boolean(sections.folders),
+        collections: Boolean(sections.collections),
+        collapsedCollectionPaths:
+          normalizedCollectionPaths,
+      }),
+    )
+  } catch {
+    // Navigation state persistence is optional.
+  }
+}
+
+function currentNextcloudUserId() {
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  return document.head?.getAttribute('data-user')
+    ?? null
+}
+
+function readStoredNavigationSelection() {
+  if (
+    typeof window === 'undefined'
+    || props.navigationStartMode !== 'last_used'
+  ) {
+    return null
+  }
+
+  const userId = currentNextcloudUserId()
+
+  if (!userId) {
+    return null
+  }
+
+  try {
+    const raw = window.localStorage.getItem(
+      NAVIGATION_SELECTION_STORAGE_KEY,
+    )
+
+    if (raw) {
+      const parsed = JSON.parse(raw)
+
+      if (
+        parsed?.version === 1
+        && parsed.userId === userId
+      ) {
+        return {
+          selectedCategory:
+            typeof parsed.selectedCategory === 'string'
+              ? parsed.selectedCategory
+              : null,
+          selectedFolder:
+            parsed.selectedFolder === null
+            || typeof parsed.selectedFolder === 'string'
+              ? parsed.selectedFolder
+              : null,
+          selectedCollection:
+            parsed.selectedCollection === null
+            || typeof parsed.selectedCollection === 'string'
+              ? parsed.selectedCollection
+              : null,
+        }
+      }
+    }
+
+    /*
+     * Import the selection stored by the previous implementation.
+     * It is used only until the dedicated storage key is written.
+     */
+    const legacyState =
+      readStoredNavigationSections()
+
+    if (!legacyState) {
+      return null
+    }
+
+    if (
+      legacyState.selectedCategory === null
+      && legacyState.selectedFolder === null
+      && legacyState.selectedCollection === null
+    ) {
+      return null
+    }
+
+    return {
+      selectedCategory:
+        legacyState.selectedCategory,
+      selectedFolder:
+        legacyState.selectedFolder,
+      selectedCollection:
+        legacyState.selectedCollection,
+    }
+  } catch {
+    return null
+  }
 }
 
 const search = ref('')
@@ -682,17 +970,67 @@ const searchScope = ref('both')
 const selectedFolder = ref(null)
 const selectedCollection = ref(null)
 const selectedCategory = ref(initialCategory())
+
+function storeNavigationSelection() {
+  if (
+    typeof window === 'undefined'
+    || props.navigationStartMode !== 'last_used'
+  ) {
+    return
+  }
+
+  const userId = currentNextcloudUserId()
+
+  if (!userId) {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(
+      NAVIGATION_SELECTION_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        userId,
+        selectedCategory: selectedCategory.value,
+        selectedFolder: selectedFolder.value,
+        selectedCollection: selectedCollection.value,
+      }),
+    )
+  } catch {
+    // Navigation selection persistence is optional.
+  }
+}
+
 const sortMode = ref('name-asc')
 const collapsedCollectionPaths = ref(new Set())
 const collectionSearch = ref('')
+const categoryMenu = ref(null)
 const navigationInitialized = ref(false)
+const navigationSelectionInitialized = ref(false)
 const dropTargetKey = ref('')
 
+watch(
+  () => props.advancedMode,
+  advancedMode => {
+    if (advancedMode) {
+      return
+    }
+
+    searchScope.value = 'both'
+    sortMode.value = 'name-asc'
+    collectionSearch.value = ''
+  },
+  {
+    immediate: true,
+  },
+)
+
+const initialNavigationSections =
+  navigationSectionsForMode(initialNavigationMode())
+
 const collapsedSections = ref({
-  categories: initialNavigationMode() === 'collapsed',
-  folders: initialNavigationMode() === 'collapsed',
-  collections:
-    initialNavigationMode() !== 'expanded',
+  folders: initialNavigationSections.folders,
+  collections: initialNavigationSections.collections,
 })
 
 const categories = [
@@ -743,6 +1081,46 @@ const categories = [
     icon: DeleteOutlineIcon,
   },
 ]
+
+const activeCategory = computed(() =>
+  categories.find(category =>
+    category.id === selectedCategory.value,
+  ) ?? categories[0],
+)
+
+const STANDARD_CATEGORY_IDS = new Set([
+  'all',
+  'favorites',
+  'logins',
+  'totp',
+  'notes',
+])
+
+const visibleCategories = computed(() => (
+  props.advancedMode
+    ? categories
+    : categories.filter(category =>
+        STANDARD_CATEGORY_IDS.has(category.id),
+      )
+))
+
+watch(
+  [
+    () => props.advancedMode,
+    selectedCategory,
+  ],
+  ([advancedMode, category]) => {
+    if (
+      !advancedMode
+      && !STANDARD_CATEGORY_IDS.has(category)
+    ) {
+      selectCategory('all')
+    }
+  },
+  {
+    immediate: true,
+  },
+)
 
 const nameCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
@@ -1069,6 +1447,11 @@ function selectCategory(categoryId) {
   selectedFolder.value = null
   selectedCollection.value = null
 
+  if (categoryMenu.value) {
+    categoryMenu.value.open = false
+  }
+
+  storeNavigationSelection()
   emit('navigate')
 }
 
@@ -1080,6 +1463,7 @@ function selectFolder(folderId) {
   selectedCollection.value = null
   selectedCategory.value = 'all'
 
+  storeNavigationSelection()
   emit('navigate')
 }
 
@@ -1088,14 +1472,22 @@ function selectCollection(collectionId) {
   selectedFolder.value = null
   selectedCategory.value = 'all'
 
+  storeNavigationSelection()
   emit('navigate')
 }
 
 function toggleSection(section) {
-  collapsedSections.value = {
+  const nextSections = {
     ...collapsedSections.value,
     [section]: !collapsedSections.value[section],
   }
+
+  collapsedSections.value = nextSections
+
+  storeNavigationSections(
+    nextSections,
+    collapsedCollectionPaths.value,
+  )
 }
 
 function collapseAllCollections() {
@@ -1104,10 +1496,20 @@ function collapseAllCollections() {
       .filter(collection => collection.hasChildren)
       .map(collection => collection.nodeKey),
   )
+
+  storeNavigationSections(
+    collapsedSections.value,
+    collapsedCollectionPaths.value,
+  )
 }
 
 function expandAllCollections() {
   collapsedCollectionPaths.value = new Set()
+
+  storeNavigationSections(
+    collapsedSections.value,
+    collapsedCollectionPaths.value,
+  )
 }
 
 function toggleCollection(collection) {
@@ -1116,15 +1518,36 @@ function toggleCollection(collection) {
     return
   }
 
-  const paths = new Set(collapsedCollectionPaths.value)
+  const paths = new Set(
+    collapsedCollectionPaths.value,
+  )
 
   if (paths.has(collection.nodeKey)) {
     paths.delete(collection.nodeKey)
+
+    allCollectionRows.value
+      .filter(candidate => (
+        candidate.hasChildren
+        && normalizeId(candidate.organizationId)
+          === normalizeId(collection.organizationId)
+        && candidate.path !== collection.path
+        && candidate.path.startsWith(
+          `${collection.path}/`,
+        )
+      ))
+      .forEach(candidate => {
+        paths.add(candidate.nodeKey)
+      })
   } else {
     paths.add(collection.nodeKey)
   }
 
   collapsedCollectionPaths.value = paths
+
+  storeNavigationSections(
+    collapsedSections.value,
+    collapsedCollectionPaths.value,
+  )
 }
 
 function isCollectionCollapsed(collection) {
@@ -1384,24 +1807,215 @@ const activeFilterLabel = computed(() => {
   )?.label || t('nc_bitwarden', 'All items')
 })
 
+function closeCategoryMenuOnOutsidePointer(event) {
+  if (
+    categoryMenu.value?.open
+    && !categoryMenu.value.contains(event.target)
+  ) {
+    categoryMenu.value.open = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener(
+    'pointerdown',
+    closeCategoryMenuOnOutsidePointer,
+  )
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener(
+    'pointerdown',
+    closeCategoryMenuOnOutsidePointer,
+  )
+})
+
 watch(
   allCollectionRows,
   rows => {
+    /*
+     * During login and logout the collection list is temporarily
+     * empty. Do not initialize, clean, or persist the tree state
+     * until the actual collection data is available.
+     */
+    if (rows.length === 0) {
+      return
+    }
+
+    const validCollapsedPaths = new Set(
+      rows
+        .filter(collection =>
+          collection.hasChildren,
+        )
+        .map(collection =>
+          collection.nodeKey,
+        ),
+    )
+
     if (navigationInitialized.value) {
+      if (
+        props.navigationStartMode === 'last_used'
+      ) {
+        const cleanedPaths = new Set(
+          [...collapsedCollectionPaths.value]
+            .filter(path =>
+              validCollapsedPaths.has(path),
+            ),
+        )
+
+        if (
+          cleanedPaths.size
+          !== collapsedCollectionPaths.value.size
+        ) {
+          collapsedCollectionPaths.value =
+            cleanedPaths
+
+          storeNavigationSections(
+            collapsedSections.value,
+            cleanedPaths,
+          )
+        }
+      }
+
       return
     }
 
     const mode = initialNavigationMode()
 
-    collapsedCollectionPaths.value = mode === 'expanded'
-      ? new Set()
-      : new Set(
-        rows
-          .filter(collection => collection.hasChildren)
-          .map(collection => collection.nodeKey),
+    const storedState =
+      mode === 'last_used'
+        ? readStoredNavigationSections()
+        : null
+
+    if (
+      mode === 'last_used'
+      && Array.isArray(
+        storedState?.collapsedCollectionPaths,
       )
+    ) {
+      collapsedCollectionPaths.value = new Set(
+        storedState.collapsedCollectionPaths
+          .filter(path =>
+            validCollapsedPaths.has(path),
+          ),
+      )
+    } else {
+      const collectionTreeExpanded =
+        mode === 'expanded'
+        || mode === 'collections_expanded'
+        || (
+          mode === 'last_used'
+          && !collapsedSections.value.collections
+        )
+
+      collapsedCollectionPaths.value =
+        collectionTreeExpanded
+          ? new Set()
+          : validCollapsedPaths
+    }
 
     navigationInitialized.value = true
+
+    storeNavigationSections(
+      collapsedSections.value,
+      collapsedCollectionPaths.value,
+    )
+  },
+  {
+    immediate: true,
+  },
+)
+
+watch(
+  [
+    allCollectionRows,
+    () => props.folders,
+  ],
+  ([rows, nextFolders]) => {
+    if (navigationSelectionInitialized.value) {
+      return
+    }
+
+    if (props.navigationStartMode !== 'last_used') {
+      navigationSelectionInitialized.value = true
+      return
+    }
+
+    const storedState =
+      readStoredNavigationSelection()
+
+    if (!storedState) {
+      navigationSelectionInitialized.value = true
+      return
+    }
+
+    const storedCollectionId = normalizeId(
+      storedState.selectedCollection,
+    )
+
+    const storedFolderId =
+      storedState.selectedFolder === '__none__'
+        ? '__none__'
+        : normalizeId(storedState.selectedFolder)
+
+    /*
+     * VaultList is mounted before collections and folders have
+     * finished loading. Wait for the required data before
+     * deciding that a stored selection no longer exists.
+     */
+    if (
+      storedCollectionId !== null
+      && rows.length === 0
+    ) {
+      return
+    }
+
+    if (
+      storedCollectionId === null
+      && storedFolderId !== null
+      && storedFolderId !== '__none__'
+      && nextFolders.length === 0
+    ) {
+      return
+    }
+
+    if (
+      storedCollectionId !== null
+      && rows.some(row =>
+        normalizeId(row.id) === storedCollectionId,
+      )
+    ) {
+      selectedCollection.value = storedCollectionId
+      selectedFolder.value = null
+      selectedCategory.value = 'all'
+    } else if (
+      storedFolderId === '__none__'
+      || (
+        storedFolderId !== null
+        && nextFolders.some(folder =>
+          normalizeId(folder.id) === storedFolderId,
+        )
+      )
+    ) {
+      selectedFolder.value = storedFolderId
+      selectedCollection.value = null
+      selectedCategory.value = 'all'
+    } else if (
+      START_CATEGORIES.has(
+        storedState.selectedCategory,
+      )
+    ) {
+      selectedCategory.value =
+        storedState.selectedCategory
+      selectedFolder.value = null
+      selectedCollection.value = null
+    } else {
+      selectedCategory.value = 'all'
+      selectedFolder.value = null
+      selectedCollection.value = null
+    }
+
+    navigationSelectionInitialized.value = true
   },
   {
     immediate: true,
@@ -1414,6 +2028,17 @@ watch(
     if (
       selectedFolder.value === null
       || selectedFolder.value === '__none__'
+    ) {
+      return
+    }
+
+    /*
+     * Folders are temporarily empty during login and logout.
+     * Do not treat that transitional state as a deletion.
+     */
+    if (
+      (nextFolders ?? []).length === 0
+      && (props.items ?? []).length === 0
     ) {
       return
     }
@@ -1435,6 +2060,17 @@ watch(
   () => props.collections,
   nextCollections => {
     if (selectedCollection.value === null) {
+      return
+    }
+
+    /*
+     * Collections are temporarily empty during login and logout.
+     * Do not overwrite the saved selection in that state.
+     */
+    if (
+      (nextCollections ?? []).length === 0
+      && (props.items ?? []).length === 0
+    ) {
       return
     }
 
@@ -1729,6 +2365,123 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── Kompakter Kategorienfilter ── */
+.bw-vault__categories {
+  position: relative;
+  z-index: 4;
+  padding: 0.35rem 0 0.55rem;
+}
+
+.bw-vault__section-title--static {
+  display: block;
+  padding-left: 0.75rem;
+}
+
+.bw-category-select {
+  position: relative;
+  margin: 0.1rem 0.5rem 0;
+}
+
+.bw-category-select summary {
+  list-style: none;
+}
+
+.bw-category-select summary::-webkit-details-marker {
+  display: none;
+}
+
+.bw-category-select__current {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem 0.4rem 0.7rem;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius);
+  outline: none;
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+  cursor: pointer;
+}
+
+.bw-category-select__current:hover,
+.bw-category-select__current:focus-visible {
+  border-color: var(--color-primary-element);
+  background: var(--color-background-hover);
+}
+
+.bw-category-select__icon {
+  display: flex;
+  width: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.bw-category-select__label {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bw-category-select__chevron {
+  flex: 0 0 auto;
+  transition: transform 0.15s ease;
+}
+
+.bw-category-select[open] .bw-category-select__chevron {
+  transform: rotate(180deg);
+}
+
+.bw-category-select__menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  left: 0;
+  overflow: visible;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius-large);
+  background: var(--color-main-background);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+}
+
+.bw-category-select__option {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border: 0;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-main-text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.bw-category-select__option:hover,
+.bw-category-select__option:focus-visible {
+  background: var(--color-background-hover);
+}
+
+.bw-category-select__option--active {
+  background: var(--color-primary-element-light);
+  font-weight: 600;
+}
+
+.bw-category-select__option--trash {
+  margin-top: 0.3rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
 }
 
 /* ── Ordner ── */

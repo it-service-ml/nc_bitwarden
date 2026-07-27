@@ -14,6 +14,7 @@
         </span>
 
         <button
+          v-if="advancedMode"
           type="button"
           class="bw-items-panel__new"
           :class="{
@@ -45,7 +46,7 @@
     </header>
 
     <div
-      v-if="selectionMode"
+      v-if="advancedMode && selectionMode"
       class="bw-items-panel__bulk-bar"
     >
       <strong>
@@ -71,7 +72,10 @@
         <template v-if="trashMode">
           <button
             type="button"
-            :disabled="selectedCount === 0"
+            :disabled="
+              selectedCount === 0
+                || !selectedCanRestore
+            "
             @click="emitBulk('bulk-restore')"
           >
             {{
@@ -85,7 +89,10 @@
           <button
             type="button"
             class="bw-items-panel__bulk-delete"
-            :disabled="selectedCount === 0"
+            :disabled="
+              selectedCount === 0
+                || !selectedCanDelete
+            "
             @click="
               emitBulk(
                 'bulk-delete-permanent',
@@ -104,7 +111,10 @@
         <template v-else>
           <button
             type="button"
-            :disabled="selectedCount === 0"
+            :disabled="
+              selectedCount === 0
+                || !selectedCanEdit
+            "
             @click="emitBulk('bulk-folder')"
           >
             {{
@@ -117,7 +127,10 @@
 
           <button
             type="button"
-            :disabled="selectedCount === 0"
+            :disabled="
+              selectedCount === 0
+                || !selectedCanAssignCollections
+            "
             @click="
               emitBulk('bulk-collections')
             "
@@ -133,7 +146,10 @@
           <button
             type="button"
             class="bw-items-panel__bulk-delete"
-            :disabled="selectedCount === 0"
+            :disabled="
+              selectedCount === 0
+                || !selectedCanDelete
+            "
             @click="emitBulk('bulk-delete')"
           >
             {{
@@ -163,7 +179,11 @@
           'bw-items-panel__row--selected':
             isSelected(item),
         }"
-        :draggable="!trashMode"
+        :draggable="
+          advancedMode
+            && !trashMode
+            && canEditItem(item)
+        "
         @dragstart="startDrag($event, item)"
       >
         <button
@@ -223,6 +243,7 @@
         >
           <template v-if="trashMode">
             <button
+              v-if="canRestoreItem(item)"
               type="button"
               class="bw-items-panel__action"
               :title="
@@ -245,6 +266,10 @@
             </button>
 
             <button
+              v-if="
+                advancedMode
+                  && canDeleteItem(item)
+              "
               type="button"
               class="
                 bw-items-panel__action
@@ -277,6 +302,10 @@
 
           <template v-else>
             <button
+              v-if="
+                advancedMode
+                  && canDuplicateItem(item)
+              "
               type="button"
               class="bw-items-panel__action"
               :title="
@@ -301,6 +330,7 @@
             </button>
 
             <button
+              v-if="canEditItem(item)"
               type="button"
               class="bw-items-panel__action"
               :title="
@@ -323,6 +353,10 @@
             </button>
 
             <button
+              v-if="
+                advancedMode
+                  && canDeleteItem(item)
+              "
               type="button"
               class="
                 bw-items-panel__action
@@ -393,6 +427,12 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+
+  collections: {
+    type: Array,
+    default: () => [],
+  },
+
   title: {
     type: String,
     default: '',
@@ -404,6 +444,11 @@ const props = defineProps({
   selectionRevision: {
     type: Number,
     default: 0,
+  },
+
+  advancedMode: {
+    type: Boolean,
+    required: true,
   },
 
   trashMode: {
@@ -447,12 +492,95 @@ const selectedCount = computed(() =>
   selectedItems.value.length,
 )
 
+const selectedCanEdit = computed(() =>
+  selectedItems.value.length > 0
+    && selectedItems.value.every(canEditItem),
+)
+
+const selectedCanAssignCollections = computed(() =>
+  selectedItems.value.length > 0
+    && selectedItems.value.every(
+      canAssignCollectionsItem,
+    ),
+)
+
+const selectedCanDelete = computed(() =>
+  selectedItems.value.length > 0
+    && selectedItems.value.every(canDeleteItem),
+)
+
+const selectedCanRestore = computed(() =>
+  selectedItems.value.length > 0
+    && selectedItems.value.every(canRestoreItem),
+)
+
 const allVisibleSelected = computed(() =>
   props.items.length > 0
   && props.items.every(item =>
     selectedIds.value.has(normalizeId(item.id)),
   ),
 )
+
+// Stufe 2O-2: Berechtigungen der Listeneinträge
+function itemIsPersonal(item) {
+  return !String(
+    item?.organizationId
+    ?? '',
+  ).trim()
+}
+
+function canEditItem(item) {
+  return itemIsPersonal(item)
+    || item?.edit === true
+}
+
+function canViewPasswordItem(item) {
+  return itemIsPersonal(item)
+    || item?.viewPassword === true
+}
+
+function canAssignCollectionsItem(item) {
+  return (
+    canEditItem(item)
+    && canViewPasswordItem(item)
+  )
+}
+
+function canManageAssignedCollection(item) {
+  if (itemIsPersonal(item)) {
+    return true
+  }
+
+  const collectionIds =
+    item?.collectionIds
+    ?? []
+
+  return collectionIds.some(collectionId =>
+    props.collections.some(collection =>
+      normalizeId(collection.id)
+        === normalizeId(collectionId)
+      && collection.manage === true,
+    ),
+  )
+}
+
+function canDuplicateItem(item) {
+  return (
+    canEditItem(item)
+    && canViewPasswordItem(item)
+    && canManageAssignedCollection(item)
+  )
+}
+
+function canDeleteItem(item) {
+  return itemIsPersonal(item)
+    || item?.permissions?.delete === true
+}
+
+function canRestoreItem(item) {
+  return itemIsPersonal(item)
+    || item?.permissions?.restore === true
+}
 
 function itemName(item) {
   return item.name || t('nc_bitwarden', '(no name)')
@@ -497,6 +625,11 @@ function toggleSelectAll() {
 }
 
 function handleItemClick(event, item, index) {
+  if (!props.advancedMode) {
+    emit('select', item)
+    return
+  }
+
   if (!selectionMode.value && !(event.ctrlKey || event.metaKey)) {
     emit('select', item)
     return
@@ -533,22 +666,51 @@ function emitBulk(eventName) {
     return
   }
 
+  const permissionChecks = {
+    'bulk-folder': canEditItem,
+    'bulk-collections':
+      canAssignCollectionsItem,
+    'bulk-delete': canDeleteItem,
+    'bulk-restore': canRestoreItem,
+    'bulk-delete-permanent': canDeleteItem,
+  }
+
+  const permissionCheck =
+    permissionChecks[eventName]
+
+  if (
+    permissionCheck
+    && !selectedItems.value.every(
+      permissionCheck,
+    )
+  ) {
+    return
+  }
+
   emit(eventName, [...selectedItems.value])
 }
 
 function startDrag(event, item) {
-  if (props.trashMode) {
+  if (!props.advancedMode || props.trashMode) {
     event.preventDefault()
     return
   }
 
-  const itemIds = (
+  const dragItems = (
     selectionMode.value
     && isSelected(item)
     && selectedCount.value > 0
   )
-    ? selectedItems.value.map(candidate => candidate.id)
-    : [item.id]
+    ? [...selectedItems.value]
+    : [item]
+
+  if (!dragItems.every(canEditItem)) {
+    event.preventDefault()
+    return
+  }
+
+  const itemIds =
+    dragItems.map(candidate => candidate.id)
 
   event.dataTransfer?.setData(
     'application/x-warden-item-ids',
@@ -614,6 +776,18 @@ watch(
 watch(
   () => props.trashMode,
   resetSelection,
+)
+
+watch(
+  () => props.advancedMode,
+  advancedMode => {
+    if (!advancedMode) {
+      resetSelection()
+    }
+  },
+  {
+    immediate: true,
+  },
 )
 
 watch(

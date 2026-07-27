@@ -153,6 +153,7 @@
     <NcTextField
       v-model="fingerprintModel"
       :label="t('nc_bitwarden', 'Fingerprint')"
+      readonly
     />
   </section>
 </template>
@@ -161,12 +162,16 @@
 import {
   computed,
   ref,
+  watch,
 } from 'vue'
 import { t } from '@nextcloud/l10n'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import { copySensitiveText } from '../services/clipboard.js'
-import { generateSshKeyPair } from '../services/sshKeyGenerator.js'
+import {
+  fingerprintSshPublicKey,
+  generateSshKeyPair,
+} from '../services/sshKeyGenerator.js'
 
 const props = defineProps({
   privateKey: {
@@ -204,7 +209,14 @@ const privateKeyModel = computed({
 
 const publicKeyModel = computed({
   get: () => props.publicKey,
-  set: value => emit('update:publicKey', value),
+  set: value => {
+    /*
+     * Ein alter Fingerprint darf während einer Änderung
+     * des öffentlichen Schlüssels nicht speicherbar bleiben.
+     */
+    emit('update:fingerprint', '')
+    emit('update:publicKey', value)
+  },
 })
 
 const fingerprintModel = computed({
@@ -212,11 +224,95 @@ const fingerprintModel = computed({
   set: value => emit('update:fingerprint', value),
 })
 
+let fingerprintRevision = 0
+
+async function refreshFingerprint(publicKey) {
+  const revision = ++fingerprintRevision
+  const normalized = String(publicKey ?? '').trim()
+
+  if (!normalized) {
+    fingerprintModel.value = ''
+    return
+  }
+
+  try {
+    const calculated =
+      await fingerprintSshPublicKey(normalized)
+
+    if (revision === fingerprintRevision) {
+      fingerprintModel.value = calculated
+    }
+  } catch {
+    /*
+     * Ein unvollständiger oder ungültiger Public Key erhält
+     * keinen Fingerprint. Dadurch bleibt Speichern gesperrt.
+     */
+    if (revision === fingerprintRevision) {
+      fingerprintModel.value = ''
+    }
+  }
+}
+
+watch(
+  () => props.publicKey,
+  publicKey => {
+    void refreshFingerprint(publicKey)
+  },
+  {
+    immediate: true,
+  },
+)
+
 const hasExistingKey = computed(() => Boolean(
   props.privateKey.trim()
   || props.publicKey.trim()
   || props.fingerprint.trim(),
 ))
+
+function sshGeneratorErrorMessage(error) {
+  const message = String(
+    error?.message
+    ?? '',
+  )
+
+  switch (message) {
+    case 'Ed25519 key generation is not supported by this browser.':
+      return t(
+        'nc_bitwarden',
+        'Ed25519 key generation is not supported by this browser.',
+      )
+
+    case 'The browser did not return a complete Ed25519 key.':
+      return t(
+        'nc_bitwarden',
+        'The browser did not return a complete Ed25519 key.',
+      )
+
+    case 'The browser did not return a complete RSA key.':
+      return t(
+        'nc_bitwarden',
+        'The browser did not return a complete RSA key.',
+      )
+
+    case 'Unsupported RSA key size.':
+      return t(
+        'nc_bitwarden',
+        'Unsupported RSA key size.',
+      )
+
+    case 'Unsupported SSH key algorithm.':
+      return t(
+        'nc_bitwarden',
+        'Unsupported SSH key algorithm.',
+      )
+
+    default:
+      return t(
+        'nc_bitwarden',
+        'The SSH key pair could not be generated.',
+      )
+  }
+}
 
 async function generate() {
   if (
@@ -256,10 +352,8 @@ async function generate() {
       error,
     )
 
-    generatorError.value = t(
-      'nc_bitwarden',
-      error?.message
-        || 'The SSH key pair could not be generated.',
+    generatorError.value = sshGeneratorErrorMessage(
+      error,
     )
   } finally {
     generating.value = false
