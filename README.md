@@ -2,7 +2,7 @@
 
 > Native Bitwarden and Vaultwarden integration for Nextcloud
 
-![Version](https://img.shields.io/badge/Version-2.2.1-blue)
+![Version](https://img.shields.io/badge/Version-2.2.2-blue)
 ![Nextcloud](https://img.shields.io/badge/Nextcloud-31--34-0082C9?logo=nextcloud&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green)
@@ -21,23 +21,20 @@ decrypted vault contents are not sent to Nextcloud.
 
 Warden is an independent integration and is not an official Bitwarden client.
 
-## What's new in 2.2.1
+## What's new in 2.2.2
 
-Warden 2.2.1 is a security and usability maintenance release.
+Warden 2.2.2 is a bootstrap and packaging hotfix.
 
-- Server-side enforcement of administrator-controlled SSO-only operation
-- Provider binding for OAuth tokens and active OIDC login flows
-- CSRF-protected SSO start using an authenticated POST request
-- Effective brute-force throttling for failed login and two-factor attempts
-- OAuth tokens are no longer returned to browser login responses
-- Rotated refresh tokens are retained and invalid sessions are cleared
-- Complete server-side logout of OAuth and pending SSO state
-- TOTP display and editing honor restricted-password permissions
-- Manual vault refresh next to the standard and advanced view switch
-- Refresh preserves selection, navigation, search and filtering
-- Improved security-tab empty state for protected values
+- Removed the empty custom Nextcloud bootstrap class
+- Moved the application ID constant to `AppConstants`
+- Prevented duplicate loading of the former `Application` class
+- Updated controllers and settings classes to use the neutral constant class
+- Extended the release preflight to enforce the new bootstrap architecture
+- Standardized runtime directory and file permissions
+- Verified Nextcloud CLI, web routes, SSO login and vault refresh
 
 For the complete list of changes, see `CHANGELOG.md`.
+
 ## Supported providers
 
 Warden can connect to:

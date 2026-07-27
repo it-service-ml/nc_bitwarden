@@ -2,6 +2,29 @@
 
 All notable changes to Warden are documented in this file.
 
+## 2.2.2 - 2026-07-28
+
+Version 2.2.2 fixes the Nextcloud application bootstrap and release
+packaging after the 2.2.1 security release.
+
+### Fixed
+
+- Removed the empty `AppInfo/Application.php` bootstrap class
+- Moved the application identifier to `AppInfo/AppConstants.php`
+- Updated page and settings classes to use `AppConstants::APP_ID`
+- Prevented duplicate class declaration during Nextcloud CLI startup
+- Restored successful loading of Warden through Nextcloud CLI and web routes
+- Corrected runtime permissions for application metadata and PHP classes
+
+### Quality
+
+- Updated the release preflight for the bootstrap-free architecture
+- The preflight rejects a reintroduced `Application.php`
+- The preflight rejects stale `Application::APP_ID` references
+- Release archives use readable runtime permissions
+- PHP syntax, localization, ESLint and production builds were verified
+- Nextcloud app upgrade from 2.2.1 to 2.2.2 was verified
+
 ## 2.2.1 - 2026-07-28
 
 Version 2.2.1 hardens authentication and session handling and adds a

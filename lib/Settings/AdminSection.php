@@ -2,7 +2,7 @@
 
 namespace OCA\NcBitwarden\Settings;
 
-use OCA\NcBitwarden\AppInfo\Application;
+use OCA\NcBitwarden\AppInfo\AppConstants;
 use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\Settings\IIconSection;
@@ -15,7 +15,7 @@ final class AdminSection implements IIconSection {
 	}
 
 	public function getID(): string {
-		return Application::APP_ID;
+		return AppConstants::APP_ID;
 	}
 
 	public function getName(): string {
@@ -28,7 +28,7 @@ final class AdminSection implements IIconSection {
 
 	public function getIcon(): string {
 		return $this->urlGenerator->imagePath(
-			Application::APP_ID,
+			AppConstants::APP_ID,
 			'app.svg',
 		);
 	}

@@ -136,7 +136,7 @@ def check_required_files() -> None:
     required = [
         "appinfo/info.xml",
         "appinfo/routes.php",
-        "lib/AppInfo/Application.php",
+        "lib/AppInfo/AppConstants.php",
         "src/main.js",
         "src/App.vue",
         "l10n/de.php",
@@ -162,6 +162,100 @@ def check_required_files() -> None:
     print(
         "OK: Alle erforderlichen Dateien vorhanden."
     )
+
+
+def check_app_identity_architecture() -> None:
+    constants_path = (
+        ROOT / "lib/AppInfo/AppConstants.php"
+    )
+
+    legacy_application_path = (
+        ROOT / "lib/AppInfo/Application.php"
+    )
+
+    if legacy_application_path.exists():
+        fail(
+            "Die nicht benötigte Bootstrap-Klasse "
+            "lib/AppInfo/Application.php ist wieder vorhanden."
+        )
+
+    constants_text = constants_path.read_text(
+        encoding="utf-8"
+    )
+
+    app_id_pattern = re.compile(
+        r"""
+        public\s+const\s+APP_ID\s*=\s*
+        ['"]nc_bitwarden['"]\s*;
+        """,
+        re.VERBOSE,
+    )
+
+    matches = list(
+        app_id_pattern.finditer(constants_text)
+    )
+
+    if len(matches) != 1:
+        fail(
+            "AppConstants.php definiert APP_ID "
+            "nicht genau einmal als nc_bitwarden."
+        )
+
+    stale_references: list[str] = []
+    active_references: list[str] = []
+
+    lib_directory = ROOT / "lib"
+
+    for path in sorted(
+        lib_directory.rglob("*.php")
+    ):
+        content = path.read_text(
+            encoding="utf-8",
+            errors="strict",
+        )
+
+        relative = str(
+            path.relative_to(ROOT)
+        )
+
+        if (
+            "OCA\\NcBitwarden\\AppInfo\\Application"
+            in content
+            or "Application::APP_ID" in content
+        ):
+            stale_references.append(relative)
+
+        if "AppConstants::APP_ID" in content:
+            active_references.append(relative)
+
+    if stale_references:
+        fail(
+            "Veraltete Application-Verweise vorhanden: "
+            + ", ".join(stale_references)
+        )
+
+    if not active_references:
+        fail(
+            "Keine Verwendung von AppConstants::APP_ID "
+            "gefunden."
+        )
+
+    print(
+        "OK: App-ID liegt in AppConstants."
+    )
+
+    print(
+        "OK: Keine veraltete Bootstrap-Klasse "
+        "oder Application::APP_ID-Verweise vorhanden."
+    )
+
+    print(
+        "AppConstants-Verwendungen:",
+        len(active_references),
+    )
+
+    for relative in active_references:
+        print(f"  {relative}")
 
 
 def check_versions() -> None:
@@ -535,6 +629,7 @@ def main() -> int:
     print("=" * 78)
 
     check_required_files()
+    check_app_identity_architecture()
     check_versions()
     check_routes()
 
