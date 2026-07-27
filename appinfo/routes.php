@@ -8,10 +8,11 @@ return [
 		['name' => 'vaultwarden_api#prelogin',    'url' => '/api/prelogin',      'verb' => 'POST'],
 		['name' => 'vaultwarden_api#login',        'url' => '/api/login',         'verb' => 'POST'],
 		['name' => 'vaultwarden_api#refresh',      'url' => '/api/refresh',       'verb' => 'POST'],
+		['name' => 'vaultwarden_api#logout',       'url' => '/api/logout',        'verb' => 'POST'],
 		['name' => 'vaultwarden_api#setPassword',    'url' => '/api/accounts/set-password', 'verb' => 'POST'],
 		['name' => 'vaultwarden_api#changePassword', 'url' => '/api/accounts/password',     'verb' => 'POST'],
 
-		['name' => 'sso#start',    'url' => '/sso/start',      'verb' => 'GET'],
+		['name' => 'sso#start',    'url' => '/sso/start',      'verb' => 'POST'],
 		['name' => 'sso#callback', 'url' => '/sso/callback',   'verb' => 'GET'],
 		['name' => 'sso#twoFactor', 'url' => '/api/sso/two-factor', 'verb' => 'POST'],
 		['name' => 'sso#result',   'url' => '/api/sso/result', 'verb' => 'GET'],

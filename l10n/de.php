@@ -636,5 +636,11 @@ $TRANSLATIONS = array (
   'The notes could not be saved.' => 'Die Notizen konnten nicht gespeichert werden.',
   'The setting could not be saved.' => 'Die Einstellung konnte nicht gespeichert werden.',
   'Warden server' => 'Warden-Server',
+  'Refresh' => 'Aktualisieren',
+  'Refresh vault' => 'Tresor aktualisieren',
+  'Refreshing vault…' => 'Tresor wird aktualisiert …',
+  'Finish editing before refreshing the vault.' => 'Schließe die Bearbeitung ab, bevor du den Tresor aktualisierst.',
+  'The vault could not be refreshed.' => 'Der Tresor konnte nicht aktualisiert werden.',
+
 );
 $PLURAL_FORMS = 'nplurals=2; plural=(n != 1);';

@@ -2,6 +2,49 @@
 
 All notable changes to Warden are documented in this file.
 
+## 2.2.1 - 2026-07-28
+
+Version 2.2.1 hardens authentication and session handling and adds a
+manual vault refresh action.
+
+### Added
+
+- Manual vault refresh next to the standard and advanced view switch
+- Refresh preserves the selected item, navigation, search, filters and sorting
+- Loading indicator and refresh protection during editing and transfers
+
+### Security
+
+- SSO-only mode is enforced server-side for classic prelogin and login
+- Access and refresh tokens are bound to the configured provider
+- Pending OIDC flows are bound to their originating provider
+- Provider mismatches invalidate the complete Warden session
+- SSO authorization starts through a CSRF-protected POST request
+- Failed login and two-factor attempts activate brute-force throttling
+- OAuth tokens are removed from browser login responses
+- Rotated refresh tokens are retained
+- Failed token refresh attempts clear the Warden session
+- Logout clears tokens, expiry data, provider binding and pending SSO state
+- Restricted-password permissions also protect TOTP seeds
+
+### Fixed
+
+- TOTP values are hidden when password-view permission is unavailable
+- Protected TOTP values remain unchanged while editing other fields
+- The security tab shows the correct empty state for protected values
+- The functional bounded attachment-download implementation remains active
+- Vault changes can be loaded without refreshing the entire Nextcloud page
+
+### Validation
+
+- SSO-only and logout behavior tested through Nextcloud services
+- Provider and SSO-flow mismatch behavior tested
+- OIDC login tested successfully after the security changes
+- Attachment download tested successfully after the final rollback
+- Manual vault refresh tested successfully in production
+- PHP syntax, ESLint, localization and production builds passed
+- Public assets and blocked development paths verified
+
 ## 2.2.0 - 2026-07-27
 
 Version 2.2.0 focuses on safer item editing, permission-aware actions,

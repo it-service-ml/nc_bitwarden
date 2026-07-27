@@ -54,6 +54,30 @@
             {{ t('nc_bitwarden', 'Advanced') }}
           </button>
         </div>
+
+        <button
+          type="button"
+          class="bw-interface-mode__refresh"
+          :disabled="
+            manualRefreshPending
+              || loading
+              || manualRefreshBlocked
+          "
+          :title="manualRefreshTitle"
+          :aria-label="manualRefreshTitle"
+          @click="refreshVault"
+        >
+          <NcLoadingIcon
+            v-if="manualRefreshPending || loading"
+            :size="18"
+          />
+
+          <RefreshIcon v-else :size="18" />
+
+          <span>
+            {{ t('nc_bitwarden', 'Refresh') }}
+          </span>
+        </button>
       </div>
 
       <div
@@ -316,6 +340,7 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
 import LockOutlineIcon from 'vue-material-design-icons/LockOutline.vue'
+import RefreshIcon from 'vue-material-design-icons/Refresh.vue'
 import LoginForm from './components/LoginForm.vue'
 import VaultList from './components/VaultList.vue'
 import VaultItems from './components/VaultItems.vue'
@@ -367,6 +392,7 @@ const trashMode = ref(false)
 const selectedItem = ref(null)
 const restoreSelectedItemPending = ref(false)
 const loading = ref(false)
+const manualRefreshPending = ref(false)
 const showForm = ref(false)
 const editItem = ref(null)
 
@@ -403,6 +429,36 @@ const dropTransferActive = computed(() => (
     dropTransferTarget.value.collectionId,
   )
 ))
+
+const manualRefreshBlocked = computed(() => (
+  showForm.value
+  || inlineNoteSaveItem.value !== null
+  || dropTransferActive.value
+))
+
+const manualRefreshTitle = computed(() => {
+  if (
+    manualRefreshPending.value
+    || loading.value
+  ) {
+    return t(
+      'nc_bitwarden',
+      'Refreshing vault…',
+    )
+  }
+
+  if (manualRefreshBlocked.value) {
+    return t(
+      'nc_bitwarden',
+      'Finish editing before refreshing the vault.',
+    )
+  }
+
+  return t(
+    'nc_bitwarden',
+    'Refresh vault',
+  )
+})
 
 const vaultProfile = ref({})
 const userPreferences = ref(
@@ -903,9 +959,23 @@ function resetVaultState() {
   vaultProfile.value = {}
 }
 
-function logout() {
+async function logout() {
+  /*
+   * Der Browser wird sofort gesperrt. Die serverseitigen
+   * Vaultwarden-Tokens werden anschließend unabhängig davon
+   * aus der Nextcloud-Sitzung entfernt.
+   */
   clearSessionKey()
   resetVaultState()
+
+  try {
+    await VaultwardenApi.logout()
+  } catch (exception) {
+    console.warn(
+      '[nc_bitwarden] Server-side logout failed:',
+      exception,
+    )
+  }
 }
 
 onMounted(async () => {
@@ -993,6 +1063,70 @@ async function reloadVaultAndReset(selectedId = null) {
   }
 
   return true
+}
+
+async function refreshVault() {
+  if (
+    manualRefreshPending.value
+    || loading.value
+    || manualRefreshBlocked.value
+  ) {
+    return
+  }
+
+  const selectedId =
+    selectedItem.value?.id ?? null
+
+  manualRefreshPending.value = true
+
+  try {
+    const loaded = await reloadVaultAndReset(
+      selectedId,
+    )
+
+    if (!loaded) {
+      alert(
+        t(
+          'nc_bitwarden',
+          'The vault could not be refreshed.',
+        ),
+      )
+
+      return
+    }
+
+    /*
+     * loadVault setzt visibleItems zunächst auf alle Einträge.
+     * Eine neue Array-Referenz löst den synchronen Filter-Watcher
+     * von VaultList erneut aus. Suche, Kategorie, Ordner,
+     * Sammlung und Sortierung bleiben dadurch erhalten.
+     */
+    items.value = [...items.value]
+
+    if (
+      selectedId
+      && !selectedItem.value
+    ) {
+      storeSelectedItemId(null)
+    }
+  } catch (exception) {
+    console.error(
+      '[nc_bitwarden] Manual vault refresh failed:',
+      exception,
+    )
+
+    alert(
+      exception?.response?.data?.error
+      || exception?.response?.data?.message
+      || exception?.message
+      || t(
+        'nc_bitwarden',
+        'The vault could not be refreshed.',
+      ),
+    )
+  } finally {
+    manualRefreshPending.value = false
+  }
 }
 
 function onFilterChange({
@@ -2413,6 +2547,7 @@ function openEditForm(item) {
 
 .bw-interface-mode {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
@@ -2453,6 +2588,33 @@ function openEditForm(item) {
 .bw-interface-mode__button--active {
   background: var(--color-primary-element);
   color: var(--color-primary-element-text);
+}
+
+.bw-interface-mode__refresh {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.4rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-pill);
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bw-interface-mode__refresh:not(:disabled):hover,
+.bw-interface-mode__refresh:not(:disabled):focus-visible {
+  border-color: var(--color-primary-element);
+  background: var(--color-background-hover);
+}
+
+.bw-interface-mode__refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .bw-unlocked > .bw-layout {

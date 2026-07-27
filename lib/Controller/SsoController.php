@@ -29,15 +29,15 @@ final class SsoController extends Controller {
 	}
 
 	#[NoAdminRequired]
-	#[NoCSRFRequired]
 	#[UseSession]
-	public function start(): RedirectResponse {
+	public function start(): JSONResponse {
 		try {
-			return new RedirectResponse(
-				$this->ssoService->createAuthorizationUrl(
-					$this->userId,
-				),
-			);
+			return new JSONResponse([
+				'url' => $this->ssoService
+					->createAuthorizationUrl(
+						$this->userId,
+					),
+			]);
 		} catch (\Exception $e) {
 			$this->logger->error(
 				'nc_bitwarden: SSO start failed',
@@ -47,8 +47,13 @@ final class SsoController extends Controller {
 				],
 			);
 
-			return new RedirectResponse(
-				$this->appUrl(['sso' => 'error']),
+			return new JSONResponse(
+				[
+					'error'
+						=> 'SSO-Anmeldung konnte '
+							. 'nicht gestartet werden.',
+				],
+				500,
 			);
 		}
 	}
@@ -109,10 +114,13 @@ final class SsoController extends Controller {
 				],
 			);
 
-			return new JSONResponse(
+			$response = new JSONResponse(
 				['error' => $e->getMessage()],
 				401,
 			);
+			$response->throttle();
+
+			return $response;
 		}
 	}
 

@@ -11,12 +11,14 @@ final class SsoService {
 	private const FLOW_STATE_KEY = 'warden_sso_state';
 	private const FLOW_VERIFIER_KEY = 'warden_sso_verifier';
 	private const FLOW_CREATED_KEY = 'warden_sso_created';
+	private const FLOW_PROVIDER_KEY = 'warden_sso_provider_fingerprint';
 	private const PENDING_CODE_KEY = 'warden_sso_code';
 	private const RESULT_KEY = 'warden_sso_result';
 
 	private const SESSION_TOKEN_KEY = 'bw_access_token';
 	private const SESSION_REFRESH_KEY = 'bw_refresh_token';
 	private const SESSION_EXPIRY_KEY = 'bw_token_expiry';
+	private const SESSION_PROVIDER_KEY = 'bw_provider_fingerprint';
 
 	private const STATE_PREFIX = 'warden_nc.';
 	private const FLOW_TTL = 600;
@@ -38,6 +40,8 @@ final class SsoService {
 	public function createAuthorizationUrl(string $userId): string {
 		$settings = $this->getSelfHostedSettings($userId);
 		$vaultBase = rtrim((string)$settings['custom_url'], '/');
+		$providerFingerprint =
+			$this->providerFingerprint($userId);
 
 		$state = self::STATE_PREFIX . $this->base64Url(
 			random_bytes(32),
@@ -57,6 +61,10 @@ final class SsoService {
 		$this->session->set(self::FLOW_STATE_KEY, $state);
 		$this->session->set(self::FLOW_VERIFIER_KEY, $verifier);
 		$this->session->set(self::FLOW_CREATED_KEY, time());
+		$this->session->set(
+			self::FLOW_PROVIDER_KEY,
+			$providerFingerprint,
+		);
 
 		$query = http_build_query(
 			[
@@ -86,7 +94,11 @@ final class SsoService {
 		string $code,
 		string $state,
 	): array {
-		$verifier = $this->validateCallback($code, $state);
+		$verifier = $this->validateCallback(
+			$userId,
+			$code,
+			$state,
+		);
 
 		/*
 		 * Der Code und der PKCE-Verifier müssen erhalten bleiben,
@@ -136,7 +148,8 @@ final class SsoService {
 			);
 		}
 
-		[$code, $verifier] = $this->getPendingFlow();
+		[$code, $verifier] =
+			$this->getPendingFlow($userId);
 
 		$exchange = $this->exchangeToken(
 			$userId,
@@ -171,7 +184,17 @@ final class SsoService {
 		return is_array($result) ? $result : null;
 	}
 
+	public function logout(): void {
+		$this->session->remove(self::SESSION_TOKEN_KEY);
+		$this->session->remove(self::SESSION_REFRESH_KEY);
+		$this->session->remove(self::SESSION_EXPIRY_KEY);
+		$this->session->remove(self::SESSION_PROVIDER_KEY);
+		$this->session->remove(self::RESULT_KEY);
+		$this->clearFlow();
+	}
+
 	private function validateCallback(
+		string $userId,
 		string $code,
 		string $state,
 	): string {
@@ -187,6 +210,15 @@ final class SsoService {
 			$this->session->get(self::FLOW_CREATED_KEY) ?? 0
 		);
 
+		$storedProvider = (string)(
+			$this->session->get(
+				self::FLOW_PROVIDER_KEY,
+			) ?? ''
+		);
+
+		$currentProvider =
+			$this->providerFingerprint($userId);
+
 		if (
 			$code === ''
 			|| $state === ''
@@ -196,6 +228,11 @@ final class SsoService {
 			|| !hash_equals($expectedState, $state)
 			|| $created <= 0
 			|| time() - $created > self::FLOW_TTL
+			|| $storedProvider === ''
+			|| !hash_equals(
+				$currentProvider,
+				$storedProvider,
+			)
 		) {
 			$this->clearFlow();
 
@@ -210,7 +247,9 @@ final class SsoService {
 	/**
 	 * @return array{0: string, 1: string}
 	 */
-	private function getPendingFlow(): array {
+	private function getPendingFlow(
+		string $userId,
+	): array {
 		$code = (string)(
 			$this->session->get(self::PENDING_CODE_KEY) ?? ''
 		);
@@ -223,11 +262,25 @@ final class SsoService {
 			$this->session->get(self::FLOW_CREATED_KEY) ?? 0
 		);
 
+		$storedProvider = (string)(
+			$this->session->get(
+				self::FLOW_PROVIDER_KEY,
+			) ?? ''
+		);
+
+		$currentProvider =
+			$this->providerFingerprint($userId);
+
 		if (
 			$code === ''
 			|| $verifier === ''
 			|| $created <= 0
 			|| time() - $created > self::FLOW_TTL
+			|| $storedProvider === ''
+			|| !hash_equals(
+				$currentProvider,
+				$storedProvider,
+			)
 		) {
 			$this->clearFlow();
 
@@ -371,7 +424,7 @@ final class SsoService {
 			throw $e;
 		}
 
-		$this->storeTokens($data);
+		$this->storeTokens($userId, $data);
 		$this->session->set(self::RESULT_KEY, $result);
 		$this->clearFlow();
 	}
@@ -560,7 +613,10 @@ final class SsoService {
 		return strtolower($email);
 	}
 
-	private function storeTokens(array $data): void {
+	private function storeTokens(
+		string $userId,
+		array $data,
+	): void {
 		$this->session->set(
 			self::SESSION_TOKEN_KEY,
 			(string)$data['access_token'],
@@ -577,13 +633,48 @@ final class SsoService {
 				(string)$data['refresh_token'],
 			);
 		}
+
+		$this->session->set(
+			self::SESSION_PROVIDER_KEY,
+			$this->providerFingerprint($userId),
+		);
 	}
 
 	private function clearFlow(): void {
 		$this->session->remove(self::FLOW_STATE_KEY);
 		$this->session->remove(self::FLOW_VERIFIER_KEY);
 		$this->session->remove(self::FLOW_CREATED_KEY);
+		$this->session->remove(self::FLOW_PROVIDER_KEY);
 		$this->session->remove(self::PENDING_CODE_KEY);
+	}
+
+	private function providerFingerprint(
+		string $userId,
+	): string {
+		$urls = $this->settingsService->getApiUrls(
+			$userId,
+		);
+
+		$identity = rtrim(
+			(string)($urls['identity'] ?? ''),
+			'/',
+		);
+
+		$api = rtrim(
+			(string)($urls['api'] ?? ''),
+			'/',
+		);
+
+		if ($identity === '' || $api === '') {
+			throw new \RuntimeException(
+				'Die Provider-Adressen sind ungültig.',
+			);
+		}
+
+		return hash(
+			'sha256',
+			$identity . "\n" . $api,
+		);
 	}
 
 	private function base64Url(string $value): string {

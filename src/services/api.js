@@ -88,6 +88,7 @@ export const VaultwardenApi = {
     return (await axios.post(base('/api/login'), data)).data
   },
   async refresh() { return (await axios.post(base('/api/refresh'))).data },
+  async logout() { return (await axios.post(base('/api/logout'))).data },
   async setMasterPassword(data) {
     return (
       await axios.post(
@@ -106,8 +107,10 @@ export const VaultwardenApi = {
     ).data
   },
 
-  getSsoStartUrl() {
-    return base('/sso/start')
+  async startSso() {
+    return (
+      await axios.post(base('/sso/start'))
+    ).data
   },
 
   async completeSsoTwoFactor(twoFactorToken) {

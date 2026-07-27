@@ -10,6 +10,7 @@ final class VaultwardenProxyService {
 	private const SESSION_TOKEN_KEY = 'bw_access_token';
 	private const SESSION_REFRESH_KEY = 'bw_refresh_token';
 	private const SESSION_EXPIRY_KEY = 'bw_token_expiry';
+	private const SESSION_PROVIDER_KEY = 'bw_provider_fingerprint';
 
 	private array $baseOptions = [
 		'allow_redirects' => false,
@@ -40,6 +41,8 @@ final class VaultwardenProxyService {
 	 * Endpunkt seit Nov 2022: POST {identity}/accounts/prelogin
 	 */
 	public function prelogin(string $userId, string $email): array {
+		$this->assertClassicLoginAllowed($userId);
+
 		$urls = $this->settingsService->getApiUrls($userId);
 		$client = $this->httpClientService->newClient();
 		try {
@@ -66,6 +69,8 @@ final class VaultwardenProxyService {
 	 * Login: POST {identity}/connect/token  (OAuth2 Password Grant)
 	 */
 	public function login(string $userId, array $credentials): array {
+		$this->assertClassicLoginAllowed($userId);
+
 		$urls = $this->settingsService->getApiUrls($userId);
 		$settings = $this->settingsService->getSettings($userId);
 		$client = $this->httpClientService->newClient();
@@ -129,15 +134,46 @@ final class VaultwardenProxyService {
 				$data['error_description'] ?? $data['error'] ?? 'Login fehlgeschlagen'
 			);
 		}
-		$this->session->set(self::SESSION_TOKEN_KEY, $data['access_token']);
-		$this->session->set(self::SESSION_EXPIRY_KEY, time() + ($data['expires_in'] ?? 3600));
+		$this->session->set(
+			self::SESSION_TOKEN_KEY,
+			(string)$data['access_token'],
+		);
+		$this->session->set(
+			self::SESSION_EXPIRY_KEY,
+			time() + (int)($data['expires_in'] ?? 3600),
+		);
+
 		if (!empty($data['refresh_token'])) {
-			$this->session->set(self::SESSION_REFRESH_KEY, $data['refresh_token']);
+			$this->session->set(
+				self::SESSION_REFRESH_KEY,
+				(string)$data['refresh_token'],
+			);
 		}
+
+		$this->session->set(
+			self::SESSION_PROVIDER_KEY,
+			$this->providerFingerprintFromUrls($urls),
+		);
+
+		/*
+		 * Access- und Refresh-Token bleiben ausschließlich in der
+		 * serverseitigen Nextcloud-Sitzung. Der Browser benötigt nur
+		 * die kryptografischen Entsperrparameter.
+		 */
+		unset(
+			$data['access_token'],
+			$data['refresh_token'],
+			$data['token_type'],
+			$data['expires_in'],
+			$data['scope'],
+		);
+
 		return $data;
 	}
 
 	public function refreshToken(string $userId): void {
+		$this->assertTokenProviderMatches($userId);
+
 		$refreshToken = $this->session->get(self::SESSION_REFRESH_KEY);
 		if (!$refreshToken) {
 			throw new \RuntimeException('Kein Refresh-Token – bitte erneut einloggen.');
@@ -157,11 +193,59 @@ final class VaultwardenProxyService {
 				])
 			);
 		} catch (\Exception $e) {
-			throw new \RuntimeException($this->extractErrorMessage($e), 0, $e);
+			$this->logout();
+
+			throw new \RuntimeException(
+				$this->extractErrorMessage($e),
+				401,
+				$e,
+			);
 		}
-		$data = json_decode($this->responseBodyToString($response->getBody()), true);
-		$this->session->set(self::SESSION_TOKEN_KEY, $data['access_token']);
-		$this->session->set(self::SESSION_EXPIRY_KEY, time() + ($data['expires_in'] ?? 3600));
+		$data = json_decode(
+			$this->responseBodyToString(
+				$response->getBody(),
+			),
+			true,
+		);
+
+		if (
+			!is_array($data)
+			|| empty($data['access_token'])
+		) {
+			$this->logout();
+
+			throw new \RuntimeException(
+				'Ungültige Antwort beim Erneuern der Sitzung.',
+			);
+		}
+
+		$this->session->set(
+			self::SESSION_TOKEN_KEY,
+			(string)$data['access_token'],
+		);
+		$this->session->set(
+			self::SESSION_EXPIRY_KEY,
+			time() + (int)($data['expires_in'] ?? 3600),
+		);
+
+		/*
+		 * Manche OAuth-Server rotieren das Refresh-Token bei jedem
+		 * erfolgreichen Refresh. Das neue Token muss dann das alte
+		 * Token ersetzen.
+		 */
+		if (!empty($data['refresh_token'])) {
+			$this->session->set(
+				self::SESSION_REFRESH_KEY,
+				(string)$data['refresh_token'],
+			);
+		}
+	}
+
+	public function logout(): void {
+		$this->session->remove(self::SESSION_TOKEN_KEY);
+		$this->session->remove(self::SESSION_REFRESH_KEY);
+		$this->session->remove(self::SESSION_EXPIRY_KEY);
+		$this->session->remove(self::SESSION_PROVIDER_KEY);
 	}
 
 	/**
@@ -640,8 +724,113 @@ final class VaultwardenProxyService {
 		);
 	}
 
+	private function providerFingerprint(
+		string $userId,
+	): string {
+		return $this->providerFingerprintFromUrls(
+			$this->settingsService->getApiUrls($userId),
+		);
+	}
+
+	private function providerFingerprintFromUrls(
+		array $urls,
+	): string {
+		$identity = rtrim(
+			(string)($urls['identity'] ?? ''),
+			'/',
+		);
+
+		$api = rtrim(
+			(string)($urls['api'] ?? ''),
+			'/',
+		);
+
+		if ($identity === '' || $api === '') {
+			throw new \RuntimeException(
+				'Die Provider-Adressen sind ungültig.',
+				500,
+			);
+		}
+
+		return hash(
+			'sha256',
+			$identity . "\n" . $api,
+		);
+	}
+
+	private function assertTokenProviderMatches(
+		string $userId,
+	): void {
+		$storedFingerprint = (string)(
+			$this->session->get(
+				self::SESSION_PROVIDER_KEY,
+			) ?? ''
+		);
+
+		$expectedFingerprint =
+			$this->providerFingerprint($userId);
+
+		if (
+			$storedFingerprint === ''
+			|| !hash_equals(
+				$expectedFingerprint,
+				$storedFingerprint,
+			)
+		) {
+			$this->logout();
+
+			throw new \RuntimeException(
+				'Die Warden-Sitzung gehört zu einem '
+				. 'anderen oder nicht mehr gültigen '
+				. 'Provider. Bitte erneut anmelden.',
+				401,
+			);
+		}
+	}
+
+	private function assertClassicLoginAllowed(
+		string $userId,
+	): void {
+		$settings = $this->settingsService->getSettings(
+			$userId,
+		);
+
+		if (
+			($settings['classic_login_allowed'] ?? false)
+			!== true
+		) {
+			throw new \RuntimeException(
+				'Die klassische Anmeldung wurde '
+				. 'vom Administrator deaktiviert.',
+				403,
+			);
+		}
+	}
+
 	private function ensureValidToken(string $userId): void {
-		$expiry = (int)($this->session->get(self::SESSION_EXPIRY_KEY) ?? 0);
+		$token = (string)(
+			$this->session->get(
+				self::SESSION_TOKEN_KEY,
+			) ?? ''
+		);
+
+		if ($token === '') {
+			$this->logout();
+
+			throw new \RuntimeException(
+				'Keine aktive Warden-Sitzung vorhanden.',
+				401,
+			);
+		}
+
+		$this->assertTokenProviderMatches($userId);
+
+		$expiry = (int)(
+			$this->session->get(
+				self::SESSION_EXPIRY_KEY,
+			) ?? 0
+		);
+
 		if (time() >= ($expiry - 60)) {
 			$this->refreshToken($userId);
 		}

@@ -2,7 +2,7 @@
 
 > Native Bitwarden and Vaultwarden integration for Nextcloud
 
-![Version](https://img.shields.io/badge/Version-2.2.0-blue)
+![Version](https://img.shields.io/badge/Version-2.2.1-blue)
 ![Nextcloud](https://img.shields.io/badge/Nextcloud-31--34-0082C9?logo=nextcloud&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green)
@@ -21,22 +21,23 @@ decrypted vault contents are not sent to Nextcloud.
 
 Warden is an independent integration and is not an official Bitwarden client.
 
-## What's new in 2.2.0
+## What's new in 2.2.1
 
-Warden 2.2.0 improves the safety and reliability of editing existing vault
-items without redefining the features already released in 2.0.0 and 2.1.0.
+Warden 2.2.1 is a security and usability maintenance release.
 
-- Standard and advanced modes for item details and editing
-- Preservation of hidden, advanced and type-specific item data
-- Safer item-type changes and organization or collection assignments
-- Permission-aware editing, deletion and password visibility
-- Item duplication, unsaved-change warnings and `Ctrl+Enter` saving
-- Clear feedback for concurrent changes made by another client
-- Completed German interface localization
-- Reproducible and automatically validated translation catalogs
+- Server-side enforcement of administrator-controlled SSO-only operation
+- Provider binding for OAuth tokens and active OIDC login flows
+- CSRF-protected SSO start using an authenticated POST request
+- Effective brute-force throttling for failed login and two-factor attempts
+- OAuth tokens are no longer returned to browser login responses
+- Rotated refresh tokens are retained and invalid sessions are cleared
+- Complete server-side logout of OAuth and pending SSO state
+- TOTP display and editing honor restricted-password permissions
+- Manual vault refresh next to the standard and advanced view switch
+- Refresh preserves selection, navigation, search and filtering
+- Improved security-tab empty state for protected values
 
 For the complete list of changes, see `CHANGELOG.md`.
-
 ## Supported providers
 
 Warden can connect to:
@@ -126,6 +127,7 @@ SSH keys can be displayed, edited and generated in the browser.
 - Bulk folder and collection operations
 - Bulk transfer from personal vaults to organizations
 - Inline note editing
+- Manual vault refresh while preserving navigation, filters and selection
 
 Search deliberately excludes passwords, TOTP secrets, SSH private keys and
 hidden custom-field values.

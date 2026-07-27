@@ -636,7 +636,12 @@ OC.L10N.register(
     "The item was changed in another client. Your changes were not saved. Reload the vault and open the item again.": "Der Eintrag wurde in einem anderen Client geändert. Deine Änderungen wurden nicht gespeichert. Lade den Tresor neu und öffne den Eintrag erneut.",
     "The notes could not be saved.": "Die Notizen konnten nicht gespeichert werden.",
     "The setting could not be saved.": "Die Einstellung konnte nicht gespeichert werden.",
-    "Warden server": "Warden-Server"
+    "Warden server": "Warden-Server",
+    "Refresh": "Aktualisieren",
+    "Refresh vault": "Tresor aktualisieren",
+    "Refreshing vault…": "Tresor wird aktualisiert …",
+    "Finish editing before refreshing the vault.": "Schließe die Bearbeitung ab, bevor du den Tresor aktualisierst.",
+    "The vault could not be refreshed.": "Der Tresor konnte nicht aktualisiert werden."
 },
     "nplurals=2; plural=(n != 1);"
 );

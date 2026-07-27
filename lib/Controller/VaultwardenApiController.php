@@ -3,6 +3,7 @@
 
 namespace OCA\NcBitwarden\Controller;
 
+use OCA\NcBitwarden\Service\SsoService;
 use OCA\NcBitwarden\Service\VaultwardenProxyService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\BruteForceProtection;
@@ -18,6 +19,7 @@ final class VaultwardenApiController extends Controller {
 		string $appName,
 		IRequest $request,
 		private VaultwardenProxyService $proxyService,
+		private SsoService $ssoService,
 		private IConfig $config,
 		private LoggerInterface $logger,
 		private string $userId,
@@ -26,37 +28,106 @@ final class VaultwardenApiController extends Controller {
 	}
 
 	#[NoAdminRequired]
-	#[BruteForceProtection(action: 'bw_prelogin')]
 	public function prelogin(): JSONResponse {
 		try {
-			return new JSONResponse($this->proxyService->prelogin(
-				$this->userId,
-				(string)$this->request->getParam('email', '')
-			));
+			return new JSONResponse(
+				$this->proxyService->prelogin(
+					$this->userId,
+					(string)$this->request->getParam(
+						'email',
+						'',
+					),
+				),
+			);
 		} catch (\Exception $e) {
-			$this->logger->warning('nc_bitwarden: prelogin failed', [
-				'userId' => $this->userId, 'error' => $e->getMessage(),
-			]);
-			return new JSONResponse(['error' => $e->getMessage()], 502);
+			$this->logger->warning(
+				'nc_bitwarden: prelogin failed',
+				[
+					'userId' => $this->userId,
+					'error' => $e->getMessage(),
+				],
+			);
+
+			$status = (int)$e->getCode();
+
+			if ($status < 400 || $status > 499) {
+				$status = 502;
+			}
+
+			return new JSONResponse(
+				['error' => $e->getMessage()],
+				$status,
+			);
 		}
 	}
 
 	#[NoAdminRequired]
 	#[BruteForceProtection(action: 'bw_login')]
 	public function login(): JSONResponse {
+		$twoFactorToken = trim(
+			(string)$this->request->getParam(
+				'twoFactorToken',
+				'',
+			),
+		);
+
 		try {
-			return new JSONResponse($this->proxyService->login($this->userId, [
-				'email' => (string)$this->request->getParam('email', ''),
-				'passwordHash' => (string)$this->request->getParam('passwordHash', ''),
-				'twoFactorProvider' => $this->request->getParam('twoFactorProvider'),
-				'twoFactorToken' => (string)$this->request->getParam('twoFactorToken', ''),
-				'twoFactorRemember' => (bool)$this->request->getParam('twoFactorRemember', false),
-			]));
+			$result = $this->proxyService->login(
+				$this->userId,
+				[
+					'email' => (string)$this->request
+						->getParam('email', ''),
+					'passwordHash' => (string)$this->request
+						->getParam('passwordHash', ''),
+					'twoFactorProvider' => $this->request
+						->getParam('twoFactorProvider'),
+					'twoFactorToken' => $twoFactorToken,
+					'twoFactorRemember' => (bool)$this->request
+						->getParam(
+							'twoFactorRemember',
+							false,
+						),
+				],
+			);
+
+			$response = new JSONResponse($result);
+
+			/*
+			 * Die erste Antwort "2FA erforderlich" ist kein
+			 * Fehlversuch. Wurde jedoch bereits ein TOTP übermittelt
+			 * und erneut 2FA angefordert, war der Code ungültig.
+			 */
+			if (
+				$twoFactorToken !== ''
+				&& !empty($result['twoFactorRequired'])
+			) {
+				$response->throttle();
+			}
+
+			return $response;
 		} catch (\Exception $e) {
-			$this->logger->warning('nc_bitwarden: login failed', [
-				'userId' => $this->userId, 'error' => $e->getMessage(),
-			]);
-			return new JSONResponse(['error' => $e->getMessage()], 401);
+			$this->logger->warning(
+				'nc_bitwarden: login failed',
+				[
+					'userId' => $this->userId,
+					'error' => $e->getMessage(),
+				],
+			);
+
+			$status = (int)$e->getCode() === 403
+				? 403
+				: 401;
+
+			$response = new JSONResponse(
+				['error' => $e->getMessage()],
+				$status,
+			);
+
+			if ($status === 401) {
+				$response->throttle();
+			}
+
+			return $response;
 		}
 	}
 
@@ -87,6 +158,16 @@ final class VaultwardenApiController extends Controller {
 			$this->logger->warning('nc_bitwarden: token refresh failed', ['error' => $e->getMessage()]);
 			return new JSONResponse(['error' => 'Sitzung abgelaufen – bitte erneut einloggen.'], 401);
 		}
+	}
+
+	#[NoAdminRequired]
+	public function logout(): JSONResponse {
+		$this->proxyService->logout();
+		$this->ssoService->logout();
+
+		return new JSONResponse([
+			'status' => 'ok',
+		]);
 	}
 
 	#[NoAdminRequired]

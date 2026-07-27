@@ -275,9 +275,11 @@
             && Number(item.type) === 1
             && (
               !canViewPasswordItem
-              || !item.login?.password
+              || (
+                !item.login?.password
+                && !item.login?.totp
+              )
             )
-            && !item.login?.totp
             && !item.login?.fido2Credentials?.length
             && !passwordHistoryEntries.length
         "
@@ -411,7 +413,10 @@
         </section>
 
         <TotpDisplay
-          v-if="item.login.totp"
+          v-if="
+            canViewPasswordItem
+              && item.login.totp
+          "
           :secret="item.login.totp"
         />
 

@@ -518,7 +518,10 @@
             </div>
 
             <NcPasswordField
-              v-if="!advancedMode"
+              v-if="
+                !advancedMode
+                  && !passwordRestricted
+              "
               v-model="form.totp"
               :label="
                 t(
@@ -625,7 +628,10 @@
               </div>
             </div>
 
-            <div class="bw-form__totp-editor">
+            <div
+              v-if="!passwordRestricted"
+              class="bw-form__totp-editor"
+            >
               <div class="bw-form__passkeys-title">
                 {{
                   t(
@@ -1225,7 +1231,9 @@ const form = reactive({
       ? props.item.login.uris
       : [{}]
   ).map(normalizeLoginUri),
-  totp: props.item?.login?.totp ?? '',
+  totp: passwordRestricted.value
+    ? ''
+    : (props.item?.login?.totp ?? ''),
   passkeys: (
     props.item?.login?.fido2Credentials
     ?? []
@@ -2096,6 +2104,16 @@ async function buildPayload() {
         ),
       )
 
+    /*
+     * Bei ausgeblendeten Passwörtern gehört auch der TOTP-Seed
+     * zu den geschützten Daten. Er darf weder in einem Editor
+     * erscheinen noch durch einen leeren Formularwert ersetzt
+     * werden.
+     */
+    const effectiveTotp = passwordRestricted.value
+      ? String(props.item?.login?.totp ?? '')
+      : String(form.totp ?? '')
+
     payload.login = {
       username: form.username
         ? await encrypt(
@@ -2111,9 +2129,9 @@ async function buildPayload() {
         )
         : null,
 
-      totp: form.totp
+      totp: effectiveTotp
         ? await encrypt(
-          form.totp,
+          effectiveTotp,
           encryptionKey,
         )
         : null,

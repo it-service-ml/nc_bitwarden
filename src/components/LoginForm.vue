@@ -779,10 +779,10 @@ async function submitPrimary() {
     return
   }
 
-  startSsoLogin()
+  await startSsoLogin()
 }
 
-function startSsoLogin() {
+async function startSsoLogin() {
   error.value = ''
   info.value = ''
   masterPassword.value = ''
@@ -802,7 +802,7 @@ function startSsoLogin() {
   )
 
   ssoPopup = window.open(
-    VaultwardenApi.getSsoStartUrl(),
+    'about:blank',
     'warden-sso-login',
     [
       'popup=yes',
@@ -823,7 +823,46 @@ function startSsoLogin() {
     return
   }
 
-  ssoPopup.focus()
+  try {
+    const result = await VaultwardenApi.startSso()
+    const authorizationUrl = String(
+      result?.url ?? '',
+    )
+
+    if (!authorizationUrl.startsWith('https://')) {
+      throw new Error(
+        t(
+          'nc_bitwarden',
+          'SSO login failed. Please try again.',
+        ),
+      )
+    }
+
+    if (ssoPopup.closed) {
+      throw new Error(
+        t(
+          'nc_bitwarden',
+          'The SSO window was blocked by the browser.',
+        ),
+      )
+    }
+
+    ssoPopup.location.href = authorizationUrl
+    ssoPopup.focus()
+  } catch (exception) {
+    if (ssoPopup && !ssoPopup.closed) {
+      ssoPopup.close()
+    }
+
+    ssoPopup = null
+
+    error.value = exception.response?.data?.error
+      ?? exception.message
+      ?? t(
+        'nc_bitwarden',
+        'SSO login failed. Please try again.',
+      )
+  }
 }
 
 async function completeSsoTwoFactor() {
