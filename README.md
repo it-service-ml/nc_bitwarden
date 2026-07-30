@@ -175,13 +175,13 @@ Browser                         Nextcloud                     Provider
    │  Authentication request        │                            │
    ├───────────────────────────────▶│───────────────────────────▶│
    │                                │                            │
-   │                                │◀──── Encrypted data ──────│
+   │                                │◀──── Encrypted data ─────-─│
    │◀──── Encrypted vault data ─────│                            │
    │                                │                            │
-   │  Key derivation, verification, encryption and decryption   │
-   │  take place in the browser.                                │
+   │  Key derivation, verification, encryption and decryption    │
+   │  take place in the browser.                                 │
    │                                │                            │
-   │  Plaintext vault contents remain in the browser.           │
+   │  Plaintext vault contents remain in the browser.            │
 ```
 
 The implementation includes:
@@ -294,6 +294,7 @@ location = /sso-connector.html {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
+```
 
 ### Passkey vault unlock
 
