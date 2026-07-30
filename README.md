@@ -270,6 +270,31 @@ An administrator may configure SSO-only operation to prevent use of the
 classic login form inside Warden. This does not disable classic authentication
 on the Vaultwarden server itself or in other Bitwarden-compatible clients.
 
+#### Vaultwarden reverse-proxy callback bridge
+
+When Warden uses Vaultwarden OIDC single sign-on, Vaultwarden redirects web
+clients through its own `/sso-connector.html` endpoint.
+
+The Vaultwarden reverse proxy must forward callback requests whose `state`
+starts with `warden_nc.` to the Warden callback in Nextcloud. Other
+Vaultwarden and Bitwarden client requests must continue to use the original
+Vaultwarden connector.
+
+Example for Nginx:
+
+```nginx
+location = /sso-connector.html {
+    if ($arg_state ~ "^warden_nc\.") {
+        return 302 "https://cloud.example.com/index.php/apps/nc_bitwarden/sso/callback?code=$arg_code&state=$arg_state";
+    }
+
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
 ### Passkey vault unlock
 
 Passkey vault unlock is currently available after Vaultwarden OIDC SSO and is
