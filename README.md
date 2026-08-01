@@ -588,10 +588,10 @@ Warden is licensed under the
 
 ## Credits
 
-Warden is maintained by **Christian Thiele / Mission Leben IT**.
+Warden is maintained by **Christian Thiele**.
 
 The original Nextcloud application was created by **Philipp Tannich** and was
-subsequently extended and modernized by Mission Leben IT.
+subsequently extended and modernized by Christian Thiele.
 
 Related projects:
 
